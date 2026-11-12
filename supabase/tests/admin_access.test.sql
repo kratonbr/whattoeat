@@ -1,7 +1,48 @@
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT extensions.plan(37);
+SELECT extensions.plan(43);
+
+-- Verify grants separately from row policies. service_role is deliberately
+-- privileged and BYPASSRLS; it must remain server-only and never reach the app.
+SELECT extensions.ok(
+    NOT EXISTS (
+        SELECT 1
+        FROM (VALUES ('public.recipes'), ('public.recipe_translations'), ('public.ingredients'), ('public.ingredient_translations'), ('public.recipe_ingredients')) AS t(name)
+        WHERE has_table_privilege('anon', name, 'INSERT')
+           OR has_table_privilege('anon', name, 'UPDATE')
+           OR has_table_privilege('anon', name, 'DELETE')
+    ),
+    'anon has no editorial write grants'
+);
+SELECT extensions.ok(
+    NOT EXISTS (
+        SELECT 1
+        FROM (VALUES ('public.recipes'), ('public.recipe_translations'), ('public.ingredients'), ('public.ingredient_translations'), ('public.recipe_ingredients')) AS t(name)
+        WHERE NOT has_table_privilege('authenticated', name, 'INSERT')
+           OR NOT has_table_privilege('authenticated', name, 'UPDATE')
+           OR NOT has_table_privilege('authenticated', name, 'DELETE')
+    ),
+    'authenticated has DML grants needed for RLS-protected admin operations'
+);
+SELECT extensions.ok(
+    NOT EXISTS (
+        SELECT 1
+        FROM (VALUES ('public.recipes'), ('public.recipe_translations'), ('public.ingredients'), ('public.ingredient_translations'), ('public.recipe_ingredients')), ('storage.objects') AS t(name)
+        WHERE NOT has_table_privilege('service_role', name, 'SELECT')
+           OR NOT has_table_privilege('service_role', name, 'INSERT')
+           OR NOT has_table_privilege('service_role', name, 'UPDATE')
+           OR NOT has_table_privilege('service_role', name, 'DELETE')
+           OR NOT has_table_privilege('service_role', name, 'TRUNCATE')
+           OR NOT has_table_privilege('service_role', name, 'REFERENCES')
+           OR NOT has_table_privilege('service_role', name, 'TRIGGER')
+    ),
+    'service_role retains its expected full table privileges'
+);
+SELECT extensions.ok(
+    (SELECT rolbypassrls FROM pg_roles WHERE rolname = 'service_role'),
+    'service_role retains BYPASSRLS and must remain secret'
+);
 
 -- Exercise policies using Supabase's request claim setting, without creating
 -- permanent users or rows. All fixture changes are rolled back at the end.
@@ -30,6 +71,15 @@ SELECT extensions.throws_ok(
     $$INSERT INTO storage.objects (id, bucket_id, name)
       VALUES ('00000000-0000-4000-8000-000000000003', 'recipe-images', '00000000-0000-4000-8000-000000000001/0123456789abcdef0123456789abcdef.jpg')$$,
     '42501', NULL, 'anon cannot upload recipe images'
+);
+RESET ROLE;
+
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","user_metadata":{"role":"admin"}}', true);
+SET LOCAL ROLE authenticated;
+SELECT extensions.throws_ok(
+    $$INSERT INTO public.recipes (id, category, prep_time_minutes, status)
+      VALUES ('00000000-0000-4000-8000-000000000004', 'lunch', 20, 'draft')$$,
+    '42501', NULL, 'a user_metadata role cannot grant administrative access'
 );
 RESET ROLE;
 
@@ -132,6 +182,15 @@ SELECT extensions.throws_ok(
 SELECT extensions.throws_ok(
     $$INSERT INTO public.recipe_ingredients (recipe_id, ingredient_id, quantity, display_order) VALUES ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002', 2, 1)$$,
     '42501', NULL, 'anon cannot link ingredients to recipes'
+);
+RESET ROLE;
+
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","user_metadata":{"role":"admin"}}', true);
+SET LOCAL ROLE authenticated;
+SELECT extensions.throws_ok(
+    $$INSERT INTO public.recipes (id, category, prep_time_minutes, status)
+      VALUES ('00000000-0000-4000-8000-000000000004', 'lunch', 20, 'draft')$$,
+    '42501', NULL, 'a user_metadata role cannot grant administrative access'
 );
 RESET ROLE;
 

@@ -3,6 +3,10 @@
 
 -- The baseline reflects the observed remote grants. Tighten them before
 -- enabling the administrative RLS policies: RLS does not constrain TRUNCATE.
+-- Also pin the existing trigger function's search_path to clear the mutable
+-- search_path warning without changing its trigger behavior.
+ALTER FUNCTION public.update_updated_at() SET search_path = '';
+
 REVOKE ALL PRIVILEGES ON TABLE
     public.recipes,
     public.recipe_translations,
@@ -10,6 +14,9 @@ REVOKE ALL PRIVILEGES ON TABLE
     public.ingredient_translations,
     public.recipe_ingredients
 FROM anon, authenticated;
+
+-- service_role intentionally remains privileged as provisioned by Supabase.
+-- It has BYPASSRLS and must never be used by this application or exposed to clients.
 
 GRANT SELECT ON TABLE
     public.recipes,
