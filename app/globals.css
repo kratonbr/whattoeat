@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --background: #f7f5ef;
+  --foreground: #20352a;
 }
 
 @theme inline {
@@ -12,15 +13,77 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
+  min-height: 100vh;
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: #dce9d3;
+  color: #20352a;
+}
+
+button,
+summary {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #d8794c;
+  outline-offset: 3px;
+}
+
+.recipe-card-enter {
+  animation: card-enter 480ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.placeholder-orbit {
+  animation: orbit-drift 9s ease-in-out infinite alternate;
+}
+
+@keyframes card-enter {
+  from {
+    opacity: 0.72;
+    transform: translateY(10px) scale(0.99);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes orbit-drift {
+  from {
+    transform: translateY(-4px) rotate(-7deg);
+  }
+
+  to {
+    transform: translateY(8px) rotate(8deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
