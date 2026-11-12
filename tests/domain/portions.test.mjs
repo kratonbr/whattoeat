@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatPortionQuantity } from "../../domain/portions.mjs";
+import { formatPortionQuantity } from "../../modules/recipes/domain/portions.mjs";
 
 test("scales a numeric ingredient amount proportionally", () => {
   assert.equal(formatPortionQuantity(200, 2, 1), "100");

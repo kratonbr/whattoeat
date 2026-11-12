@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatPortionQuantity } from "@/domain/portions.mjs";
+import { formatPortionQuantity } from "@/modules/recipes/domain/portions.mjs";
 
 const servingOptions = [1, 2, 3, 4, 5];
 

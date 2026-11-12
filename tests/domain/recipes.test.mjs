@@ -4,7 +4,7 @@ import {
   DEFAULT_RECIPE_LOCALE,
   resolveRecipeIdFromSlugMatches,
   selectCanonicalRecipeSlug,
-} from "../../domain/recipes.mjs";
+} from "../../modules/recipes/domain/recipes.mjs";
 
 test("uses Brazilian Portuguese as the default recipe locale", () => {
   assert.equal(DEFAULT_RECIPE_LOCALE, "pt-BR");
