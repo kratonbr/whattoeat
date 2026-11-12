@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 
 const METRICS = [
   { key: "total", label: "Total de receitas", description: "Receitas cadastradas no catálogo" },
@@ -136,14 +137,10 @@ export default function DashboardClient() {
 
       <section aria-labelledby="quick-actions-title" className="mt-9 rounded-2xl border border-[#E1E7DC] bg-[#FFFEFA] p-5 sm:p-6">
         <h2 id="quick-actions-title" className="text-lg font-extrabold">Acessos rápidos</h2>
-        <p className="mt-1 text-sm text-[#667469]">As áreas de gerenciamento serão habilitadas nas próximas etapas.</p>
+        <p className="mt-1 text-sm text-[#667469]">Acesse o catálogo editorial para revisar e organizar os dados.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <div aria-disabled="true" className="flex items-center justify-between rounded-xl border border-[#E1E7DC] bg-[#F7F5EF] px-4 py-4 text-sm font-semibold text-[#667469]">
-            <span>Gerenciar receitas</span><span className="text-xs">Em breve</span>
-          </div>
-          <div aria-disabled="true" className="flex items-center justify-between rounded-xl border border-[#E1E7DC] bg-[#F7F5EF] px-4 py-4 text-sm font-semibold text-[#667469]">
-            <span>Gerenciar ingredientes</span><span className="text-xs">Em breve</span>
-          </div>
+          <Link className="flex items-center justify-between rounded-xl border border-[#E1E7DC] bg-[#F7F5EF] px-4 py-4 text-sm font-semibold text-[#315B42] transition hover:border-[#B8C9B5] hover:bg-[#E9F0E5]" href="/admin/recipes">Gerenciar receitas<span aria-hidden="true">→</span></Link>
+          <Link className="flex items-center justify-between rounded-xl border border-[#E1E7DC] bg-[#F7F5EF] px-4 py-4 text-sm font-semibold text-[#315B42] transition hover:border-[#B8C9B5] hover:bg-[#E9F0E5]" href="/admin/ingredients">Gerenciar ingredientes<span aria-hidden="true">→</span></Link>
         </div>
       </section>
     </section>

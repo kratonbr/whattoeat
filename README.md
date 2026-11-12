@@ -1,36 +1,125 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# 🍽️ WhatToEat
 
-## Getting Started
+**Não sabe o que comer? Deixe o WhatToEat escolher por você!**
 
-First, run the development server:
+O **WhatToEat** é uma aplicação web que ajuda você a decidir o que preparar, sugerindo receitas de forma aleatória de acordo com a categoria selecionada.
+
+O projeto está sendo desenvolvido com foco em uma experiência simples, rápida e intuitiva, com suporte a múltiplos idiomas e uma arquitetura preparada para futuras expansões.
+
+---
+
+## ✨ Funcionalidades
+
+- 🎲 Sorteio aleatório de receitas.
+- 🍕 Seleção de receitas por categoria.
+- 📖 Visualização de ingredientes e modo de preparo.
+- ⚖️ Ajuste de quantidades conforme o número de porções.
+- 🌎 Suporte a português brasileiro e inglês.
+- 🔐 Autenticação para administradores.
+- 🛠️ Painel administrativo em desenvolvimento.
+
+## 🛠️ Tecnologias
+
+| Tecnologia | Utilização |
+|---|---|
+| Next.js | Framework web e APIs |
+| React | Interface do usuário |
+| JavaScript | Linguagem de programação |
+| Tailwind CSS | Estilização |
+| Supabase | PostgreSQL e autenticação |
+| GitHub | Versionamento do código |
+
+## 🏗️ Arquitetura
+
+O projeto utiliza uma arquitetura modular inspirada nos princípios de **Clean Architecture**, **SOLID** e separação de responsabilidades.
+
+A organização considera quatro camadas:
+
+- **Presentation:** interface, páginas e endpoints HTTP.
+- **Application:** casos de uso e coordenação das operações.
+- **Domain:** regras de negócio e validações.
+- **Infrastructure:** comunicação com banco de dados e serviços externos.
+
+Os módulos são organizados por funcionalidades, como receitas, ingredientes e administração.
+
+## 🔒 Segurança
+
+O WhatToEat utiliza autenticação com Supabase Auth e autorização administrativa no backend.
+
+As operações administrativas são projetadas para exigir uma sessão válida e permissões específicas, com políticas de segurança no banco de dados como camada adicional de proteção.
+
+## 🚧 Status do desenvolvimento
+
+**Em desenvolvimento ativo.**
+
+| Módulo | Status |
+|---|---|
+| Interface pública | Implementada |
+| Sorteio de receitas | Implementado |
+| Detalhes e porções | Implementado |
+| Internacionalização | Implementada |
+| Autenticação administrativa | Parcial |
+| Dashboard administrativo | Parcial |
+| Gerenciamento de receitas | Em desenvolvimento |
+| Gerenciamento de ingredientes | Planejado |
+| Traduções administrativas | Planejado |
+| Upload de imagens | Planejado |
+
+## 🚀 Executando localmente
+
+### Pré-requisitos
+
+- Node.js compatível com o projeto
+- npm
+- Projeto Supabase configurado
+
+Clone o repositório:
+
+```bash
+git clone https://github.com/kratonbr/whattoeat.git
+cd whattoeat
+```
+
+Instale as dependências:
+
+```bash
+npm install
+```
+
+Configure as variáveis de ambiente conforme os arquivos e instruções do projeto, sem publicar credenciais privadas.
+
+Inicie o servidor:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Acesse:
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+```text
+http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Verificações
 
-## Learn More
+```bash
+npm test
+npm run lint
+npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+## 🗺️ Próximos passos
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Concluir o painel administrativo.
+- Implementar o gerenciamento completo de receitas.
+- Integrar upload e gerenciamento de imagens.
+- Ampliar os testes automatizados.
+- Preparar a arquitetura para uma futura aplicação mobile.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 👨‍💻 Desenvolvimento
 
-## Deploy on Vercel
+Desenvolvido por [kratonbr](https://github.com/kratonbr).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**WhatToEat — Sua próxima refeição começa aqui.**

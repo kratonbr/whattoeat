@@ -81,7 +81,7 @@ async function RecipeDetails({ slug, locale }) {
     notFound();
   }
 
-  const imageSource = getImageSource(recipe.image_path);
+  const imageSource = getImageSource(recipe.image_url || recipe.image_path);
   const instructions = Array.isArray(recipe.instructions)
     ? recipe.instructions.filter((step) => typeof step === "string" && step.trim())
     : [];

@@ -7,7 +7,7 @@ Roadmap oficial para desenvolver, proteger, lançar e monetizar o WhatToEat. Est
 Estado atualizado em 12/11/2026, com inspeção do repositório, execução de testes/lint/build, validações manuais relatadas pelo usuário e consultas somente de leitura ao Supabase realizadas anteriormente.
 
 - **Aplicação:** Next.js App Router, JavaScript, React e Tailwind CSS. `package.json` contém comandos `dev`, `build`, `start`, `lint` e `test`.
-- **Backend existente:** cliente Supabase server-only em `lib/supabase/server.js`; serviços em `services/recipes.js`; Route Handlers `GET /api/meals/random` e `GET /api/recipes/[slug]`.
+- **Backend existente:** módulos de receitas/administração, casos de uso, repositórios Supabase server-only e Route Handlers públicos e administrativos. As APIs editoriais validam identidade e papel admin no servidor, sem service_role.
 - **Autenticação administrativa:** login e logout via Route Handlers com `@supabase/ssr`, cookies geridos no servidor e autorização baseada em `app_metadata.role = "admin"`. O usuário relata que cadastro público está desativado no Supabase e que criou/promoveu sua conta pelo Dashboard/SQL Editor.
 - **Área administrativa:** `/admin/login`, rota protegida, layout responsivo, endpoint de resumo e cards do dashboard estão implementados. A rota verifica admin no servidor; o cliente só apresenta a resposta da API. A interface usa pt-BR. Devido às políticas RLS remotas atuais, apenas a contagem de receitas publicadas está disponível como dado real; os outros indicadores aparecem indisponíveis.
 - **Frontend existente:** página inicial com sorteio, seleção das cinco categorias, estados de carregamento/erro/vazio, seletor ENGLISH/PORTUGUÊS e link “Ver receita”. A rota dinâmica `app/recipes/[slug]/page.js` apresenta detalhes e ajuste local das porções.
@@ -15,11 +15,11 @@ Estado atualizado em 12/11/2026, com inspeção do repositório, execução de t
 - **Arquivos e histórico do banco:** existem `supabase/seed.sql`, `supabase/config.toml` e o baseline `supabase/migrations/20261111233556_initial_schema_baseline.sql`. A CLI Supabase v2.122.1 está fixada como dependência de desenvolvimento. O histórico remoto do projeto `agihkhcwaqprtftfjyyn` registra `20261111233556` como aplicada; o SQL do baseline não foi executado novamente no remoto.
 - **Supabase remoto — tabelas e registros:** `recipes` (10), `recipe_translations` (20), `ingredients` (33), `ingredient_translations` (66) e `recipe_ingredients` (73). As 10 receitas estão publicadas, duas em cada categoria; existem 10 traduções de receita e 33 de ingrediente em cada idioma atual.
 - **Relacionamentos principais:** receita → traduções e receita → itens de receita; item de receita → ingrediente; ingrediente → traduções. As chaves estrangeiras e unicidades foram inspecionadas. `instructions` tem constraint que exige array JSONB.
-- **Integridade e acesso:** consulta somente de leitura de 12/11/2026 confirmou RLS nas cinco tabelas e políticas apenas de `SELECT` público sobre receitas publicadas e relações correspondentes. Não existe política administrativa. Grants amplos observados não removem a restrição de RLS. Nenhuma política foi alterada.
-- **Testes e validação:** `npm test` passou com 57 testes (31 de API/domínio público, 13 de Auth/admin e 13 novos de API/serviço/cálculo do dashboard). `npm run lint` e `npm run build` passaram em 12/11/2026. Não há testes E2E; o dashboard não foi validado com uma sessão real nesta execução.
+- **Integridade e acesso:** inspeção somente de leitura confirmou RLS nas cinco tabelas e políticas públicas de SELECT para conteúdo publicado. Também confirmou ALL PRIVILEGES para anon e authenticated nas cinco tabelas, incluindo TRUNCATE, REFERENCES e TRIGGER; RLS não limita TRUNCATE. A migration local revoga esses grants amplos e concede permissões mínimas com RLS administrativa. Nenhuma alteração foi aplicada no remoto.
+- **Testes e validação:** em 12/11/2026, npm test passou com 84 testes, npm run lint passou e npm run build passou. Os testes incluem API pública, autenticação/autorização, dashboard, validações editoriais e imagens. Não há E2E nem validação contra Supabase isolado; Docker não está instalado.
 - **Validação manual anterior:** o usuário confirmou login real, autenticação e acesso administrativo. Não há confirmação manual de logout, expiração de sessão ou bloqueio de usuários comuns. Recuperação de senha continua pendente.
 - **Limites da validação administrativa:** não há evidência manual de logout, sessão expirada ou bloqueio de usuário comum; esses cenários não estão registrados como validados manualmente. Recuperação de senha continua pendente. Testes automatizados de unidade/handlers não equivalem a validação end-to-end.
-- **Limitações atuais confirmadas:** o baseline ainda não foi reproduzido em banco isolado, e o procedimento de promoção/rollback não está documentado. Faltam políticas RLS administrativas; dashboard está parcial e as métricas completas dependem delas. Não há bucket de Storage nem gestão editorial. Permanecem pendentes busca, filtros além de categoria, compartilhamento, funcionalidades de usuário ou monetização. A validação formal de responsividade e a configuração equivalente na Vercel também estão pendentes.
+- **Limitações atuais confirmadas:** baseline e migration administrativa ainda precisam de validação em banco isolado, indisponível sem Docker. A migration 20261112035903_admin_editorial_and_storage.sql está preparada localmente, não foi aplicada no remoto e tem 37 verificações pgTAP ainda não executadas. A inspeção remota encontrou ALL PRIVILEGES incluindo TRUNCATE nas cinco tabelas para anon/authenticated e não encontrou bucket recipe-images; a migration propõe revogar os grants amplos, aplicar RLS administrativa e criar bucket privado. Dashboard completo, CRUD e imagens permanecem bloqueados pelos gates server-side até aprovação/aplicação. Não há testes E2E nem validação manual do ciclo editorial. Busca, filtros, compartilhamento, validação formal de responsividade, configuração Vercel, funcionalidades de usuário e monetização continuam pendentes.
 - **Configuração:** `.env.local` existe localmente. Valores não são reproduzidos neste documento. A presença do arquivo não comprova configuração equivalente na Vercel.
 
 ## Como acompanhar
@@ -33,10 +33,10 @@ Estado atualizado em 12/11/2026, com inspeção do repositório, execução de t
 ## Ordem recomendada e dependências
 
 1. Fechar a tarefa 1.3 reproduzindo o baseline em banco local isolado e documentando promoção/rollback; o histórico remoto já registra o baseline como aplicado.
-2. Preparar a migration de leitura administrativa para `recipes` e `recipe_translations` (1.7), revisar e obter autorização antes de qualquer aplicação remota; validar anon/admin em ambiente isolado (1.10).
-3. Após aprovação e aplicação da política, configurar `ADMIN_DASHBOARD_RLS_READY=true` somente no servidor, validar as cinco métricas contra o banco e então concluir 2.2.
+2. Revisar a migration administrativa já preparada, validar baseline e migration em banco isolado e executar o pgTAP; obter aprovação antes de qualquer aplicação remota.
+3. Após autorização e aplicação da migration, configurar ADMIN_DASHBOARD_RLS_READY somente no servidor, conferir as cinco métricas contra consultas independentes e concluir 2.2.
 4. Recuperação de senha (2.1) continua pendente; realizá-la sem criar fluxos públicos de cadastro.
-5. Iniciar 2.3 somente após autorização própria, aplicando a regra de autenticação/autorização/RLS para cada operação de leitura ou escrita.
+5. Para habilitar as funcionalidades locais 2.3–2.7, primeiro validar baseline/migration em banco isolado, aprovar a migration RLS/Storage e aplicá-la remotamente apenas mediante autorização explícita; depois configurar os gates server-side e validar o ciclo por papel.
 6. Depois da etapa administrativa planejada, retomar os fluxos públicos web pendentes (filtros 3.3, busca 3.5, compartilhamento 3.6 e validação responsiva formal 3.7); ainda faltam E2E, SEO, desempenho e acessibilidade antes do deploy.
 7. Preparar deploy, configuração segura por ambiente e monitoramento na Vercel; manter `domain/` e contratos sem dependência de Next.js ou navegador; deixar Expo, recomendações regionais, publicidade e Premium para etapas posteriores.
 
@@ -98,41 +98,41 @@ Estado atualizado em 12/11/2026, com inspeção do repositório, execução de t
 - **Como testar e validar:** consultas anônimas veem apenas dados de receitas publicadas; confirmar que INSERT/UPDATE/DELETE públicos não são permitidos.
 - **Critério para concluir:** políticas observadas cobrem as cinco tabelas e preservam leitura publicada sem escrita pública.
 
-### 1.7 Políticas RLS administrativas — [ ] Não iniciado
+### 1.7 Políticas RLS administrativas — [~] Migration local preparada; remota não aplicada
 
-- **Objetivo:** permitir operações do painel apenas às identidades administrativas autorizadas.
-- **Backend:** criar políticas de escrita e leitura de rascunhos vinculadas ao papel administrativo; evitar confiar em metadados editáveis pelo usuário.
-- **Frontend:** enviar operações apenas pelas rotas administrativas protegidas.
-- **Dependências:** Supabase Auth, autorização de administradores e migrations.
-- **Como testar e validar:** testar cada operação por papel e estado; confirmar negação por anon e usuário sem permissão.
-- **Critério para concluir:** matriz de autorização cobre tabelas e operações sem ampliar acesso público.
+- **Objetivo:** permitir operações administrativas sem ampliar acesso público.
+- **Backend:** a migration local 20261112035903_admin_editorial_and_storage.sql prepara políticas para as cinco tabelas editoriais usando app_metadata.role = admin e estreita privilégios SQL. Ainda não foi validada em banco isolado nem aplicada no remoto. Os handlers Next.js também autorizam cada requisição no servidor.
+- **Frontend:** formulários chamam somente APIs administrativas protegidas; não acessam Supabase diretamente.
+- **Dependências:** aprovação e validação isolada da migration, baseline reproduzível e ambiente Supabase local disponível.
+- **Como testar e validar:** supabase/tests/admin_access.test.sql contém 37 verificações pgTAP previstas para anon, usuário comum, admin, RLS e privilégios. Não foi executado porque Docker e banco Supabase local não estão disponíveis. O remoto permaneceu sem alterações.
+- **Critério para concluir:** validar os testes em ambiente isolado, revisar e aprovar a migration, aplicá-la apenas com autorização explícita e conferir a matriz de grants/RLS por papel no remoto.
 
-### 1.8 Supabase Storage para imagens — [ ] Não iniciado
+### 1.8 Supabase Storage para imagens — [~] Migration e integração local preparadas
 
-- **Objetivo:** armazenar fotos reais de receitas com caminhos controlados e políticas adequadas.
-- **Backend:** criar bucket privado ou público conforme a estratégia aprovada, validar MIME/tamanho, nomear objetos e definir regras de leitura/escrita/remoção.
-- **Frontend:** permitir upload, pré-visualização, substituição e remoção no painel; renderizar imagens cadastradas no público.
-- **Dependências:** autorização de administradores; políticas RLS; campos atuais `image_path` e `image_alt`.
-- **Como testar e validar:** testar upload autorizado, bloqueio de upload anônimo, leitura conforme política, arquivos inválidos e imagens ausentes.
-- **Critério para concluir:** imagens reais podem ser geridas por administradores e servidas no site sem caminhos fictícios ou permissões excessivas.
+- **Objetivo:** armazenar fotos reais de receitas com acesso controlado.
+- **Backend:** a migration local define bucket privado recipe-images, limite de 5 MiB, JPEG/PNG/WebP, políticas para imagens ligadas a receitas publicadas e gestão por admin. O servidor valida formato, assinatura e tamanho e encapsula as operações em repositório. A inspeção remota não encontrou o bucket; nada foi aplicado.
+- **Frontend:** o editor permite selecionar, pré-visualizar, substituir e remover imagem e editar texto alternativo por idioma. As operações ficam bloqueadas até ADMIN_STORAGE_READY estar ativo após a política estar pronta.
+- **Dependências:** aprovação e validação da migration e do bucket em ambiente isolado.
+- **Como testar e validar:** 7 testes automatizados cobrem autorização, origem, readiness, formatos e limpeza após falha. Falta validar o Storage real e políticas por papel.
+- **Critério para concluir:** bucket/políticas aplicados e fluxo integrado testado para upload, substituição e remoção por anon, usuário comum e admin.
 
 ### 1.9 Serviços e APIs — [~] APIs públicas e autenticação administrativa inicial
 
 - **Objetivo:** centralizar regras de domínio em serviços e expor contratos estáveis por Route Handlers.
-- **Backend:** `GET /api/meals/random` consulta receitas publicadas, categoria, idioma, exclusão e receita específica. `GET /api/recipes/[slug]` carrega detalhes publicados, traduções e ingredientes; adicionar APIs administrativas depois.
-- **Frontend:** página inicial consome a API existente; integrar novas telas aos contratos publicados, sem acesso privilegiado no cliente.
+- **Backend:** GET /api/meals/random e GET /api/recipes/[slug] atendem os fluxos públicos; APIs administrativas de dashboard, receitas, ingredientes e imagens já existem em Route Handlers e delegam para os módulos de domínio, aplicação e infraestrutura. Cada endpoint administrativo autoriza no servidor.
+- **Frontend:** interface pública consome as APIs existentes; as páginas administrativas de receitas e ingredientes consomem somente endpoints protegidos no mesmo domínio.
 - **Dependências:** schema; políticas de leitura para API pública; Auth/RLS para APIs administrativas.
 - **Como testar e validar:** conferir locale/categoria/UUID inválidos, estados 404/503/500, traduções e filtro por publicação; testar autorização das futuras rotas.
-- **Cobertura atual:** 44 testes automatizados: 31 de API/domínio público e 13 de autenticação/autorização administrativa. Não existem ainda APIs de dashboard/escrita nem testes end-to-end.
+- **Cobertura atual:** 84 testes automatizados executados nesta revisão, cobrindo contratos públicos, Auth/admin, dashboard, validação editorial e imagens. Ainda não há testes E2E.
 - **Critério para concluir:** sorteio existente permanece funcional e cada novo endpoint tem validação de entrada, erros previsíveis e autorização adequada.
 
 ### 1.10 Testes de segurança e integridade do backend — [~] Parcial
 
 - **Objetivo:** detectar acesso indevido e dados inconsistentes antes de expor novas operações.
-- **Backend:** testes automatizados cobrem aspectos do fluxo Auth/admin e contratos públicos; faltam testes de RLS real, constraints no banco isolado, consistência relacional e Storage.
+- **Backend:** 84 testes Node passaram nesta execução. Há 37 verificações pgTAP preparadas em supabase/tests/admin_access.test.sql, mas não executadas; faltam RLS real, constraints em banco isolado, consistência relacional e integração Storage.
 - **Frontend:** validar respostas de erro sem expor detalhes internos nem credenciais.
 - **Dependências:** esquema versionado, APIs, Auth, autorização e Storage.
-- **Como testar e validar:** executar testes automatizados em ambiente isolado com papéis anon, autenticado e administrador; manter nenhuma escrita na produção durante testes.
+- **Como testar e validar:** npm test, npm run lint e npm run build passaram. Para fechar a etapa, executar as verificações SQL em banco isolado com papéis anon, usuário comum e admin, sem escrita na produção.
 - **Critério para concluir:** cenários críticos de leitura, escrita, RLS, integridade e uploads têm resultados repetíveis e registrados.
 
 ---
@@ -152,69 +152,66 @@ Estado atualizado em 12/11/2026, com inspeção do repositório, execução de t
 
 - **Objetivo:** permitir que administradores entrem e recuperem acesso ao painel.
 - **Backend:** login/logout via Route Handlers e sessão SSR implementados; autorização de administrador verificada no servidor por `app_metadata.role`. Recuperação de senha não implementada.
-- **Frontend:** `/admin/login`, mensagens genéricas em pt-BR, formulário e página administrativa provisória com logout. O idioma pt-BR é regra permanente para toda a área administrativa.
+- **Frontend:** /admin/login, área protegida com navegação, dashboard e páginas locais de receitas/ingredientes; todas as telas administrativas usam pt-BR. Recuperação de senha continua pendente.
 - **Dependências:** Auth e autorização iniciais (1.4–1.5) existem; recuperação segura e políticas RLS administrativas (1.7) ainda pendentes.
-- **Como testar e validar:** 13 testes automatizados de autenticação/autorização. Validação manual relatada pelo usuário: login real, autenticação e acesso administrativo funcionaram. Não registrar como validação manual logout, expiração ou negativa a usuários comuns, pois não há evidência. Recuperação e end-to-end seguem pendentes.
+- **Como testar e validar:** os testes automatizados de Auth/admin permanecem cobertos dentro do conjunto de 84 testes. Validação manual relatada pelo usuário: login real, autenticação e acesso administrativo funcionaram. Logout, expiração e negativa a usuários comuns não foram confirmados manualmente. Recuperação e E2E seguem pendentes.
 - **Critério para concluir:** login, logout e recuperação com mensagens que não enumeram contas; acesso negado sem sessão/role válida; cenários automatizados e manuais registrados.
 
-### 2.2 Dashboard — [~] Parcial
+### 2.2 Dashboard — [~] Interface e cálculo prontos; leitura integral aguarda RLS
 
-- **Objetivo:** oferecer uma visão operacional do catálogo e dos itens que exigem revisão.
-- **Indicadores:** total de receitas; publicadas (`status = 'published'`); rascunhos (`status = 'draft'`); sem imagem (`image_path` nulo ou vazio); traduções pendentes para `pt-BR` e `en`. Proposta para pendência: contar uma receita uma única vez se faltar qualquer um dos dois idiomas ou se uma tradução tiver título vazio/instruções sem etapas; descrição é opcional no schema atual e não deve ser exigida sem decisão editorial.
-- **Backend implementado:** `GET /api/admin/dashboard/summary` verifica `requireAdmin()` antes de qualquer consulta. `services/admin/dashboard-summary.js` usa o cliente Supabase SSR autenticado, sem chave privilegiada. A rota retorna HTTP 401/403 e aplica `no-store`.
-- **Frontend implementado:** shell administrativo responsivo com navegação, botão de saída, cinco cards, carregamento, erro, tentativa novamente, aviso de permissão RLS incompleta e atalhos desabilitados para receitas/ingredientes. Todo texto está em pt-BR; o client chama apenas a API e não acessa Supabase.
-- **RLS remota confirmada:** as cinco tabelas têm RLS ativo e foram encontradas apenas políticas públicas de SELECT para linhas ligadas a receitas publicadas. Como PostgREST oculta linhas sem erro, contar `recipes` no escopo completo seria incorreto. Por isso, sem a configuração server-side `ADMIN_DASHBOARD_RLS_READY=true`, a API retorna somente a contagem exata de publicadas; total, rascunhos, sem imagem e traduções pendentes ficam `null`/“Indisponível”, nunca como zero ou totais incompletos.
-- **Dependências para concluir:** validar o baseline em ambiente isolado (1.3); revisar e aprovar migration de SELECT administrativo em `recipes` e `recipe_translations` (1.7); testar políticas para anon/admin em ambiente isolado (1.10). Só então definir `ADMIN_DASHBOARD_RLS_READY=true` no ambiente server-side e validar todas as métricas. Nenhuma migration foi executada nesta etapa.
-- **Regra de tradução pendente:** uma receita conta uma vez se faltar tradução `pt-BR` ou `en`, se o título estiver vazio ou se o array de instruções não tiver etapas. `description` é opcional pelo schema atual.
-- **Arquivos criados/modificados:** `domain/admin-dashboard.mjs`, `services/admin/dashboard-summary.mjs`, `services/admin/dashboard-summary.js`, `lib/api/admin-dashboard.mjs`, `app/api/admin/dashboard/summary/route.js`, `app/admin/admin-shell.js`, `app/admin/dashboard-client.js`, `app/admin/(protected)/layout.js` e `app/admin/(protected)/page.js`.
-- **Testes:** 57 passaram. Foram acrescentados 10 testes de autorização do endpoint, comportamento seguro com RLS pendente e cálculo/paginação das métricas. Ainda não há E2E nem verificação visual automatizada em navegador.
-- **Critério para concluir:** indicadores completos e conferidos contra o banco após RLS revisada; endpoint exige admin para acesso direto; consultas usam usuário autenticado e RLS; interface é apenas apresentação em pt-BR; atalhos não apontam para páginas inexistentes.
+- **Objetivo:** oferecer uma visão operacional do catálogo e itens que exigem revisão.
+- **Indicadores:** total, publicadas, rascunhos, sem imagem e traduções pendentes em pt-BR/en.
+- **Backend:** GET /api/admin/dashboard/summary verifica requireAdmin antes da consulta. O repositório usa cliente SSR autenticado e pagina os dados para calcular os indicadores, sem chave privilegiada. Sem RLS completa validada, falha fechado e não apresenta contagens incompletas como totais.
+- **Frontend:** shell responsivo em pt-BR, cinco indicadores, carregamento, erro, vazio, tentativa novamente e aviso quando a leitura completa está indisponível. Navegação aponta para as telas administrativas locais.
+- **Supabase:** as políticas remotas atuais permitem ao público apenas linhas publicadas. ADMIN_DASHBOARD_RLS_READY deve permanecer desativado até aprovação/aplicação das políticas administrativas e validação dos resultados. Nenhuma migration foi aplicada nesta execução.
+- **Arquitetura:** regras em modules/admin/domain, caso de uso em application, repositório em infrastructure/supabase, handler em presentation/http, composição server-side em services/admin, Route Handler como adaptador e interface em app/admin.
+- **Testes:** npm test passou com 84 testes; inclui autorização, falha segura quando RLS não está pronta e cálculo/paginação. Não há E2E nem validação contra banco isolado ou sessão real nesta execução.
+- **Critério para concluir:** validar todas as métricas contra banco/RLS, manter autenticação server-side e confirmar interface pt-BR após a configuração aprovada.
 
-### 2.3 Cadastro, edição, exclusão e publicação de receitas — [ ] Não iniciado
+### 2.3 Cadastro, edição, exclusão e publicação de receitas — [~] Implementação local; aguarda RLS
 
 - **Objetivo:** gerir o ciclo editorial de receitas revisadas manualmente.
-- **Backend:** implementar endpoints protegidos para criar, atualizar, arquivar/excluir e mudar `draft`/`published`, respeitando constraints e relações.
-- **Frontend:** implementar formulário e lista de receitas com rascunho, publicação, despublicação e confirmação de exclusão.
-- **Dependências:** migrations, Auth, autorização, RLS e APIs administrativas.
-- **Como testar e validar:** validar ciclo completo em ambiente de teste, incluindo erro de tradução incompleta e bloqueio por papel insuficiente.
-- **Critério para concluir:** ações são autorizadas e atômicas; apenas conteúdo completo e revisado pode ser publicado.
+- **Backend:** APIs protegidas por sessão/admin, validação server-side e de origem, repositório e persistência transacional via RPC estão implementados. As operações respondem indisponível enquanto ADMIN_EDITORIAL_RLS_READY estiver desativado.
+- **Frontend:** lista com pesquisa, categoria, status e paginação; formulário para rascunho, edição, publicação/despublicação e exclusão confirmada. Conteúdo pode ser editado em pt-BR e en.
+- **Dependências:** migration administrativa aprovada/aplicada, validação da RLS e configuração server-side do gate.
+- **Como testar e validar:** testes automatizados cobrem autorização, origem, validação e bloqueio pela RLS pendente. Falta executar o ciclo completo contra banco isolado com anon, usuário comum e admin.
+- **Critério para concluir:** confirmar ciclo editorial integrado por papel e que publicação exige traduções, instruções e ingredientes válidos.
 
-### 2.4 Cadastro de ingredientes, quantidades e unidades — [ ] Não iniciado
+### 2.4 Cadastro de ingredientes, quantidades e unidades — [~] Interface e API local; aguarda RLS
 
-- **Objetivo:** manter ingredientes reutilizáveis e vínculos ordenados com cada receita.
-- **Backend:** criar operações para ingredientes, traduções e `recipe_ingredients`; validar quantidade, unidade, exclusividade e ordem.
-- **Frontend:** oferecer busca/seleção de ingredientes, edição de quantidade/unidade, observações e reordenação.
-- **Dependências:** tarefa 2.3; schema atual e políticas administrativas.
-- **Como testar e validar:** testar ingrediente reutilizado, quantidades numéricas/textuais, unidade opcional, ordem e remoção respeitando FKs.
-- **Critério para concluir:** receita salva mantém vínculos íntegros e a ordem apresentada corresponde à ordem cadastrada.
+- **Objetivo:** reutilizar ingredientes e preservar vínculos ordenados nas receitas.
+- **Backend:** endpoints protegidos e repositório usam a RPC de gravação; validações de chave, nomes traduzidos e vínculos estão implementadas. Exclusão respeita a FK RESTRICT. Operações ficam bloqueadas até a migration/RLS ser aprovada e aplicada.
+- **Frontend:** páginas em pt-BR para pesquisar, cadastrar, editar e remover ingredientes; editor da receita permite selecionar itens, quantidades numéricas/textuais, unidade, nota e ordem.
+- **Dependências:** integração editorial habilitada somente após validação/aprovação da RLS.
+- **Como testar e validar:** testes cobrem validação e autorização; falta confirmar persistência, reutilização, ordem e FK em banco isolado.
+- **Critério para concluir:** testar dados e relações reais no banco isolado, inclusive exclusão restrita por FK.
 
-### 2.5 Traduções de receitas e ingredientes — [ ] Não iniciado
+### 2.5 Traduções de receitas e ingredientes — [~] Formulários locais; integração aguarda RLS
 
-- **Objetivo:** permitir conteúdo editorial consistente em todos os idiomas habilitados.
-- **Backend:** persistir traduções únicas por idioma para receitas e ingredientes; validar slug por idioma e instruções em array JSONB.
-- **Frontend:** fornecer campos por idioma, estado de completude e indicação de tradução faltante.
-- **Dependências:** tarefa 2.3, tarefa 2.4 e arquitetura da seção 5.
-- **Como testar e validar:** salvar/editar cada idioma, detectar slug duplicado e testar que o público recebe o idioma solicitado.
-- **Critério para concluir:** nenhum conteúdo publicado é apresentado como traduzido sem os campos obrigatórios naquele idioma.
+- **Objetivo:** manter conteúdo editorial em português brasileiro e inglês.
+- **Backend:** validação de idiomas e campos, instruções em array e persistência em repositórios/RPCs estão implementadas; constraints atuais preservam unicidade.
+- **Frontend:** formulários administrativos em português oferecem conteúdo em pt-BR e en; o dashboard identifica tradução pendente quando a leitura completa for autorizada.
+- **Dependências:** RLS administrativa habilitada e integração validada em banco isolado.
+- **Como testar e validar:** há testes automatizados de validação e publicação; falta validar gravação, slug duplicado e leitura pública depois da edição.
+- **Critério para concluir:** testar ambos os idiomas e comprovar que publicação é bloqueada diante de conteúdo obrigatório incompleto.
 
-### 2.6 Upload e gestão de imagens — [ ] Não iniciado
+### 2.6 Upload e gestão de imagens — [~] Fluxo local implementado; bucket remoto ausente
 
-- **Objetivo:** associar imagens reais às receitas e textos alternativos localizados.
-- **Backend:** usar Storage com políticas administrativas e salvar/remover o caminho do objeto de forma consistente.
-- **Frontend:** implementar upload, pré-visualização, substituição, remoção e entrada de texto alternativo.
-- **Dependências:** tarefa 1.8 e formulário de receitas.
-- **Como testar e validar:** testar arquivos permitidos/negados, acessibilidade sem imagem e consistência entre objeto e `image_path`.
-- **Critério para concluir:** imagens podem ser atualizadas sem deixar referências quebradas e sem aceitar uploads não autorizados.
+- **Objetivo:** associar imagens reais às receitas de forma segura.
+- **Backend:** endpoint protegido verifica origem, identidade, autorização, limite, MIME e assinatura; Storage é encapsulado em repositório server-only e a associação é feita por RPC. A migration define bucket e políticas, mas não foi aplicada. A consulta remota de leitura não encontrou o bucket recipe-images.
+- **Frontend:** editor permite seleção, pré-visualização, substituição, remoção e texto alternativo em cada idioma. O fluxo fica bloqueado até ADMIN_STORAGE_READY estar habilitado após aprovação da política.
+- **Dependências:** migration validada/aprovada e bucket criado conforme a configuração revisada.
+- **Como testar e validar:** 7 testes cobrem formatos, tamanho, autorização, falhas e limpeza; falta integração real com Storage e testes de políticas por papel.
+- **Critério para concluir:** testar upload, substituição e remoção no ambiente isolado para anon, usuário comum e admin, sem referências quebradas.
 
-### 2.7 Validação dos formulários administrativos — [ ] Não iniciado
+### 2.7 Validação dos formulários administrativos — [~] Validação local implementada; integração pendente
 
-- **Objetivo:** impedir publicação de dados incompletos ou incompatíveis com o schema.
-- **Backend:** validar novamente todas as entradas no servidor e mapear constraints para erros compreensíveis.
-- **Frontend:** validar campos obrigatórios, duração, porções, categoria, dificuldade, ingredientes, instruções, slugs e traduções.
-- **Dependências:** tarefas 2.3–2.6 e constraints existentes.
-- **Como testar e validar:** submeter entradas vazias, limites inválidos, duplicados, strings extensas e payloads alterados diretamente.
-- **Critério para concluir:** validação no cliente ajuda o editor e validação no servidor/banco continua sendo a autoridade final.
-
+- **Objetivo:** impedir dados incompletos ou incompatíveis com o schema.
+- **Backend:** validadores verificam receitas, traduções, UUIDs, duplicidade de ingredientes, quantidades, unidades, ordem e imagens. Handlers validam sessão, papel, origem e entrada; erros internos são mapeados para mensagens seguras em pt-BR.
+- **Frontend:** formulários apresentam campos e feedback em português; validações de cliente auxiliam, mas o servidor e o banco continuam como autoridade.
+- **Dependências:** execução de migration e validação das constraints em banco Supabase isolado.
+- **Como testar e validar:** testes automatizados cobrem regras e chamadas diretas aos endpoints; faltam constraints reais e testes E2E no Supabase isolado.
+- **Critério para concluir:** cobrir limites e constraints no banco isolado e confirmar no navegador o fluxo completo sem depender de validação client-side.
 ---
 
 ## 3. Frontend público
@@ -404,7 +401,7 @@ Estado atualizado em 12/11/2026, com inspeção do repositório, execução de t
 - **Frontend:** cobrir sorteio, idioma, categorias, páginas de receita, formulários e estados de erro.
 - **Dependências:** funcionalidades correspondentes e decisão de framework de testes.
 - **Como testar e validar:** executar testes automatizados em CI e uma lista de verificação manual para fluxos críticos.
-- **Estado atual:** há 44 testes automatizados: 15 da API de sorteio, 8 da API de detalhes, 8 de regras de domínio e 13 de autenticação/autorização administrativa. Em 12/11/2026, `npm test`, `npm run lint` e `npm run build` passaram. O usuário confirmou manualmente detalhes/navegação/porções e, separadamente, login real/autenticação/acesso administrativo. Não há testes end-to-end automatizados; logout, expiração e bloqueio manual de usuários comuns não foram confirmados.
+- **Estado atual:** em 12/11/2026 passaram npm test (84 testes), npm run lint e npm run build. Os testes cobrem API pública, autenticação/autorização, dashboard, validação editorial e imagens. O usuário validou manualmente detalhes/navegação/porções e login/acesso administrativo em sessões anteriores. Não há E2E automatizado nem validação manual registrada de logout, expiração, usuário comum ou ciclo editorial.
 - **Critério para concluir:** fluxos críticos públicos e administrativos têm cobertura repetível e bloqueiam regressões antes do deploy.
 
 ### 7.2 Testes de segurança — [ ] Não iniciado

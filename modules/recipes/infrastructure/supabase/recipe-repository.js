@@ -94,6 +94,15 @@ export function createSupabaseRecipeRepository(supabase) {
       if (includeImage) {
         result.image_path = recipe.image_path;
         result.image_alt = translation.image_alt;
+        result.image_url = null;
+        if (recipe.image_path) {
+          try {
+            const { data, error } = await supabase.storage.from("recipe-images").createSignedUrl(recipe.image_path, 3600);
+            if (!error) result.image_url = data?.signedUrl ?? null;
+          } catch {
+            result.image_url = null;
+          }
+        }
       }
       return result;
     },

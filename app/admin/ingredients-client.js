@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 const ERRORS = {
   UNAUTHENTICATED: "Sua sessão expirou. Entre novamente.",
@@ -16,19 +16,18 @@ export default function IngredientsClient() {
   const [query, setQuery] = useState("");
   const [state, setState] = useState({ status: "loading", items: [], error: "" });
   const [refresh, setRefresh] = useState(0);
-  const load = useCallback(async () => {
-    setState((current) => ({ ...current, status: "loading", error: "" }));
-    try {
-      const response = await fetch(`/api/admin/ingredients?q=${encodeURIComponent(query.trim())}`, { cache: "no-store", credentials: "same-origin" });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) return setState({ status: "error", items: [], error: ERRORS[body.error] ?? ERRORS.OPERATION_UNAVAILABLE });
-      setState({ status: "success", items: body.data ?? [], error: "" });
-    } catch {
-      setState({ status: "error", items: [], error: ERRORS.OPERATION_UNAVAILABLE });
-    }
-  }, [query]);
-
-  useEffect(() => { load(); }, [load, refresh]);
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/admin/ingredients?q=${encodeURIComponent(query.trim())}`, { cache: "no-store", credentials: "same-origin" })
+      .then(async (response) => ({ response, body: await response.json().catch(() => ({})) }))
+      .then(({ response, body }) => {
+        if (!active) return;
+        if (!response.ok) return setState({ status: "error", items: [], error: ERRORS[body.error] ?? ERRORS.OPERATION_UNAVAILABLE });
+        setState({ status: "success", items: body.data ?? [], error: "" });
+      })
+      .catch(() => { if (active) setState({ status: "error", items: [], error: ERRORS.OPERATION_UNAVAILABLE }); });
+    return () => { active = false; };
+  }, [query, refresh]);
 
   async function removeIngredient(ingredient) {
     const label = ingredient.ingredient_translations?.find((entry) => entry.language_code === "pt-BR")?.name || ingredient.ingredient_key;

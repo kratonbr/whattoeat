@@ -55,7 +55,12 @@ export function createSupabaseAdminRecipeRepository(supabase) {
       ]);
       if (translations.error) fail(translations.error);
       if (ingredients.error) fail(ingredients.error);
-      return { ...recipe, translations: translations.data ?? [], ingredients: ingredients.data ?? [] };
+      let imageUrl = null;
+      if (recipe.image_path) {
+        const { data, error: imageError } = await supabase.storage.from("recipe-images").createSignedUrl(recipe.image_path, 3600);
+        if (!imageError) imageUrl = data?.signedUrl ?? null;
+      }
+      return { ...recipe, image_url: imageUrl, translations: translations.data ?? [], ingredients: ingredients.data ?? [] };
     },
 
     async save(id, value) {
