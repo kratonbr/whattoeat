@@ -2,6 +2,7 @@ import "server-only";
 
 import { createGetRandomPublishedRecipe } from "@/modules/recipes/application/get-random-published-recipe.mjs";
 import { createGetPublishedRecipeBySlug } from "@/modules/recipes/application/get-published-recipe-by-slug.mjs";
+import { createListPublishedRecipes } from "@/modules/recipes/application/list-published-recipes.mjs";
 import { createSupabaseRecipeRepository } from "@/modules/recipes/infrastructure/supabase/recipe-repository.js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DEFAULT_RECIPE_LOCALE } from "@/modules/recipes/domain/recipes.mjs";
@@ -24,4 +25,9 @@ export async function getPublishedRecipe({
 export async function getPublishedRecipeBySlug({ slug, locale = DEFAULT_RECIPE_LOCALE }) {
   const getBySlug = createGetPublishedRecipeBySlug({ recipeRepository: createRepository() });
   return getBySlug({ slug, locale });
+}
+
+export async function listPublishedRecipes(query) {
+  const listPublished = createListPublishedRecipes({ recipeRepository: createRepository() });
+  return listPublished(query);
 }

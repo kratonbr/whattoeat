@@ -10,6 +10,8 @@ const METRICS = [
   { key: "withoutImage", label: "Sem imagem", description: "Receitas sem foto cadastrada" },
   { key: "translationsPending", label: "Traduções pendentes", description: "Sem conteúdo completo em pt-BR ou inglês" },
 ];
+const TRANSLATION_FIELDS = { title: "título", slug: "slug", instructions: "modo de preparo" };
+const LOCALE_LABELS = { "pt-BR": "Português brasileiro", en: "Inglês" };
 
 const ERROR_MESSAGES = {
   UNAUTHENTICATED: "Sua sessão expirou. Entre novamente para acessar o painel.",
@@ -120,9 +122,18 @@ export default function DashboardClient() {
         <div aria-label="Indicadores do catálogo" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {METRICS.map((metric) => {
             const value = state.data.metrics[metric.key];
-            return (
-              <article key={metric.key} className="rounded-2xl border border-[#E1E7DC] bg-[#FFFEFA] p-5 shadow-sm shadow-[#20352A]/5 sm:p-6">
-                <p className="text-sm font-semibold text-[#667469]">{metric.label}</p>
+            const filterHref = metric.key === "withoutImage"
+              ? "/admin/recipes?withoutImage=true"
+              : metric.key === "translationsPending"
+                ? "/admin/recipes?translationsPending=true"
+                : null;
+            const canOpenFilter = Boolean(filterHref) && value !== null;
+            const linkLabel = metric.key === "withoutImage"
+              ? "Ver receitas sem imagem"
+              : "Ver receitas com traduções pendentes";
+            const card = (
+              <article className={`rounded-2xl border border-[#E1E7DC] bg-[#FFFEFA] p-5 shadow-sm shadow-[#20352A]/5 sm:p-6 ${canOpenFilter ? "transition hover:border-[#B8C9B5] hover:shadow-md" : ""}`}>
+                <p className="flex items-center justify-between gap-2 text-sm font-semibold text-[#667469]">{metric.label}{canOpenFilter && <span aria-hidden="true" className="text-[#315B42]">→</span>}</p>
                 <p className={`mt-5 font-extrabold tracking-tight ${value === null ? "text-xl text-[#8A938A]" : "text-4xl text-[#254936]"}`}>
                   {value === null ? "Indisponível" : value.toLocaleString("pt-BR")}
                 </p>
@@ -131,8 +142,48 @@ export default function DashboardClient() {
                 </p>
               </article>
             );
+            return (
+              <div key={metric.key}>
+                {canOpenFilter
+                  ? <Link href={filterHref} aria-label={linkLabel} className="block rounded-2xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#D86F46]/30">{card}</Link>
+                  : card}
+              </div>
+            );
           })}
         </div>
+      )}
+
+      {state.status === "success" && state.data?.complete && (
+        <section aria-labelledby="pending-translations-title" className="mt-6 rounded-2xl border border-[#E1E7DC] bg-[#FFFEFA] p-5 sm:p-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 id="pending-translations-title" className="text-lg font-extrabold">Traduções que precisam de atenção</h2>
+              <p className="mt-1 text-sm text-[#667469]">Revisão dos campos obrigatórios para publicação em português e inglês.</p>
+            </div>
+            {state.data.metrics.translationsPending > 0 && <Link href="/admin/recipes?translationsPending=true" className="text-sm font-bold text-[#315B42] underline underline-offset-4">Ver todas</Link>}
+          </div>
+          {state.data.metrics.translationsPending === 0 ? (
+            <p role="status" className="mt-4 rounded-xl bg-[#F1F7EE] px-4 py-3 text-sm font-medium text-[#315B42]">Todas as receitas têm título, slug e modo de preparo nos dois idiomas.</p>
+          ) : (
+            <ul className="mt-4 divide-y divide-[#EEF1EA]">
+              {(state.data.pendingRecipes ?? []).map((recipe) => {
+                const firstIssue = recipe.pendingTranslations[0];
+                const firstField = firstIssue.missingFields[0];
+                const href = `/admin/recipes/${recipe.id}?focusTranslation=${encodeURIComponent(firstIssue.language_code)}&focusField=${encodeURIComponent(firstField)}`;
+                return <li key={recipe.id} className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate font-bold text-[#254936]">{recipe.title}</p>
+                    <ul className="mt-1 space-y-1 text-sm text-[#667469]">
+                      {recipe.pendingTranslations.map((pending) => <li key={pending.language_code}><span className="font-semibold">{LOCALE_LABELS[pending.language_code] ?? pending.language_code}:</span> faltam {pending.missingFields.map((field) => TRANSLATION_FIELDS[field] ?? field).join(", ")}</li>)}
+                    </ul>
+                  </div>
+                  <Link href={href} className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full border border-[#C9D6C5] px-4 text-sm font-bold text-[#315B42] hover:bg-[#E9F0E5] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#D86F46]/20">Corrigir tradução</Link>
+                </li>;
+              })}
+              {!state.data.pendingRecipes?.length && <li role="status" className="py-4 text-sm text-[#667469]">Há pendências no catálogo, mas a lista resumida não está disponível agora. Abra a listagem para consultar.</li>}
+            </ul>
+          )}
+        </section>
       )}
 
       <section aria-labelledby="quick-actions-title" className="mt-9 rounded-2xl border border-[#E1E7DC] bg-[#FFFEFA] p-5 sm:p-6">

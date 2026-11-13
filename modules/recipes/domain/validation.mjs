@@ -1,7 +1,10 @@
+import { getMissingTranslationFields } from "./translation-completeness.mjs";
+import { SUPPORTED_RECIPE_DIFFICULTIES, SUPPORTED_RECIPE_LOCALES } from "./recipes.mjs";
+
 export const RECIPE_CATEGORIES = Object.freeze(["breakfast", "lunch", "dinner", "snack", "dessert"]);
-export const RECIPE_DIFFICULTIES = Object.freeze(["easy", "medium", "hard"]);
+export const RECIPE_DIFFICULTIES = SUPPORTED_RECIPE_DIFFICULTIES;
 export const RECIPE_STATUSES = Object.freeze(["draft", "published"]);
-export const RECIPE_LOCALES = Object.freeze(["pt-BR", "en"]);
+export const RECIPE_LOCALES = SUPPORTED_RECIPE_LOCALES;
 
 const isObject = (value) => Boolean(value && typeof value === "object" && !Array.isArray(value));
 const text = (value, limit) => typeof value === "string" && value.trim().length <= limit ? value.trim() : null;
@@ -26,20 +29,32 @@ export function validateRecipePayload(value) {
   if (!Array.isArray(value.translations)) errors.push(issue("traduções", "Informe as traduções da receita."));
   else {
     const seen = new Set();
+    const legacyPortuguese = value.translations.find((entry) => entry?.language_code === "pt-BR");
+    const legacyEnglish = value.translations.find((entry) => entry?.language_code === "en");
+    const legacySlug = text(legacyPortuguese?.slug, 180) ?? text(legacyEnglish?.slug, 180) ?? "";
+    const rawCanonicalSlug = value.canonical_slug ?? legacySlug;
+    const canonicalSlug = typeof rawCanonicalSlug === "string" ? rawCanonicalSlug.trim() : "";
+    const hasValidCanonicalSlug = canonicalSlug.length <= 180 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(canonicalSlug);
+    if (value.translations.length > 0 && !hasValidCanonicalSlug) {
+      errors.push(issue("slug", "Informe um slug canônico válido para salvar as traduções."));
+    }
     for (const entry of value.translations) {
       if (!isObject(entry) || !RECIPE_LOCALES.includes(entry.language_code) || seen.has(entry.language_code)) {
         errors.push(issue("traduções", "Há um idioma inválido ou duplicado."));
         continue;
       }
       seen.add(entry.language_code);
-      const slug = text(entry.slug, 180);
-      const title = text(entry.title, 180);
+      const slug = canonicalSlug;
+      const rawTitle = typeof entry.title === "string" ? entry.title.trim() : "";
+      const title = rawTitle.length <= 180 ? rawTitle : "";
       const description = entry.description ? text(entry.description, 3000) : null;
       const imageAlt = entry.image_alt ? text(entry.image_alt, 300) : null;
       const rawInstructions = entry.instructions ?? [];
       const instructions = Array.isArray(rawInstructions) ? rawInstructions.map((step) => text(step, 1000)).filter(Boolean) : null;
-      if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) errors.push(issue(`slug ${entry.language_code}`, "Use letras minúsculas, números e hífens."));
-      if (!title) errors.push(issue(`título ${entry.language_code}`, "Preencha o título ou remova esta tradução do rascunho."));
+      if (typeof entry.title !== "undefined" && entry.title !== null && typeof entry.title !== "string") {
+        errors.push(issue(`título ${entry.language_code}`, "O título precisa ser um texto."));
+      }
+      if (rawTitle.length > 180) errors.push(issue(`título ${entry.language_code}`, "O título pode ter até 180 caracteres."));
       if (description === null && entry.description) errors.push(issue(`descrição ${entry.language_code}`, "A descrição excede o limite permitido."));
       if (imageAlt === null && entry.image_alt) errors.push(issue(`texto alternativo ${entry.language_code}`, "O texto alternativo excede o limite permitido."));
       if (!instructions || instructions.length !== rawInstructions.length) errors.push(issue(`instruções ${entry.language_code}`, "Cada etapa deve conter até 1.000 caracteres."));
@@ -75,7 +90,19 @@ export function validateRecipePayload(value) {
   if (status === "published") {
     for (const locale of RECIPE_LOCALES) {
       const translation = translations.find((entry) => entry.language_code === locale);
-      if (!translation || !translation.instructions.length) errors.push(issue(`tradução ${locale}`, "Para publicar, complete título, slug e modo de preparo em português e inglês."));
+      const missingFields = getMissingTranslationFields(translation);
+      if (missingFields.length) {
+        const fieldIssues = {
+          title: "Preencha o título desta tradução.",
+          slug: "Informe um slug canônico válido com letras minúsculas, números e hífens.",
+          instructions: "Adicione ao menos uma etapa ao modo de preparo.",
+        };
+        for (const field of missingFields) {
+          errors.push(issue(field === "slug" ? "slug" : `${field === "title" ? "título" : "instruções"} ${locale}`, fieldIssues[field]));
+        }
+        const labels = { title: "título", slug: "slug válido", instructions: "modo de preparo" };
+        errors.push(issue(`tradução ${locale}`, `Complete os campos obrigatórios (${missingFields.map((field) => labels[field]).join(", ")}) para publicar esta tradução.`));
+      }
     }
     if (!ingredients.length) errors.push(issue("ingredientes", "Adicione ao menos um ingrediente antes de publicar."));
   }
@@ -88,11 +115,18 @@ export function validateRecipeListQuery(params) {
   const category = params.get("category") || "";
   const status = params.get("status") || "";
   const search = (params.get("q") || "").trim();
+  const translationsPendingParam = params.get("translationsPending") ?? "";
+  const withoutImageParam = params.get("withoutImage") ?? "";
   const errors = [];
   if (!Number.isInteger(page) || page < 1) errors.push(issue("página", "A página informada é inválida."));
   if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) errors.push(issue("itens por página", "Use um valor entre 1 e 100."));
   if (category && !RECIPE_CATEGORIES.includes(category)) errors.push(issue("categoria", "A categoria informada é inválida."));
   if (status && !RECIPE_STATUSES.includes(status)) errors.push(issue("status", "O status informado é inválido."));
+  if (translationsPendingParam && !["true", "false"].includes(translationsPendingParam)) errors.push(issue("traduções pendentes", "O filtro de traduções pendentes é inválido."));
+  if (withoutImageParam && !["true", "false"].includes(withoutImageParam)) errors.push(issue("sem imagem", "O filtro de imagem é inválido."));
   if (search.length > 100) errors.push(issue("busca", "A busca pode ter até 100 caracteres."));
-  return { data: errors.length ? null : { page, pageSize, category, status, search }, errors };
+  const data = { page, pageSize, category, status, search };
+  if (translationsPendingParam) data.translationsPending = translationsPendingParam === "true";
+  if (withoutImageParam) data.withoutImage = withoutImageParam === "true";
+  return { data: errors.length ? null : data, errors };
 }

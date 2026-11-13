@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useAdminToast } from "./admin-toast-provider";
 
 const MESSAGES = {
   UNAUTHENTICATED: "Sua sessão expirou. Entre novamente.",
@@ -15,12 +16,20 @@ const CATEGORIES = [
   ["", "Todas as categorias"], ["breakfast", "Café da manhã"], ["lunch", "Almoço"],
   ["dinner", "Jantar"], ["snack", "Lanche"], ["dessert", "Sobremesa"],
 ];
+const TRANSLATION_FIELDS = { title: "título", slug: "slug", instructions: "modo de preparo" };
+const LOCALE_LABELS = { "pt-BR": "Português brasileiro", en: "Inglês" };
+
+function correctionHref(recipe, issue) {
+  if (!issue?.language_code || !issue.missingFields?.length) return `/admin/recipes/${recipe.id}`;
+  return `/admin/recipes/${recipe.id}?focusTranslation=${encodeURIComponent(issue.language_code)}&focusField=${encodeURIComponent(issue.missingFields[0])}`;
+}
 
 function messageFor(code) { return MESSAGES[code] ?? MESSAGES.OPERATION_UNAVAILABLE; }
 function titleFor(recipe) { return recipe.translations?.["pt-BR"]?.title || recipe.translations?.en?.title || "Receita sem título"; }
 
-export default function RecipesClient() {
-  const [filters, setFilters] = useState({ q: "", category: "", status: "" });
+export default function RecipesClient({ initialTranslationsPending = false, initialWithoutImage = false }) {
+  const { showToast } = useAdminToast();
+  const [filters, setFilters] = useState({ q: "", category: "", status: "", translationsPending: initialTranslationsPending, withoutImage: initialWithoutImage });
   const [page, setPage] = useState(1);
   const [result, setResult] = useState({ status: "loading", items: [], total: 0, page: 1, error: "" });
   const [refresh, setRefresh] = useState(0);
@@ -31,6 +40,8 @@ export default function RecipesClient() {
     if (filters.q.trim()) params.set("q", filters.q.trim());
     if (filters.category) params.set("category", filters.category);
     if (filters.status) params.set("status", filters.status);
+    if (filters.translationsPending) params.set("translationsPending", "true");
+    if (filters.withoutImage) params.set("withoutImage", "true");
     fetch(`/api/admin/recipes?${params}`, { cache: "no-store", credentials: "same-origin" })
       .then(async (response) => ({ response, body: await response.json().catch(() => ({})) }))
       .then(({ response, body }) => {
@@ -45,6 +56,22 @@ export default function RecipesClient() {
     return () => { active = false; };
   }, [filters, page, refresh]);
 
+  function setEditorialFilter(value) {
+    const nextFilters = {
+      ...filters,
+      translationsPending: value === "translationsPending",
+      withoutImage: value === "withoutImage",
+    };
+    const url = new URL(window.location.href);
+    url.searchParams.delete("translationsPending");
+    url.searchParams.delete("withoutImage");
+    if (nextFilters.translationsPending) url.searchParams.set("translationsPending", "true");
+    if (nextFilters.withoutImage) url.searchParams.set("withoutImage", "true");
+    window.history.replaceState(window.history.state, "", url);
+    setPage(1);
+    setFilters(nextFilters);
+  }
+
   async function removeRecipe(recipe) {
     if (!window.confirm(`Excluir “${titleFor(recipe)}”? Esta ação não pode ser desfeita.`)) return;
     try {
@@ -53,12 +80,13 @@ export default function RecipesClient() {
       });
       const body = response.status === 204 ? {} : await response.json().catch(() => ({}));
       if (!response.ok) {
-        window.alert(messageFor(body.error));
+        showToast(messageFor(body.error), "error");
         return;
       }
+      showToast("Receita excluída com sucesso.", "success");
       setRefresh((value) => value + 1);
     } catch {
-      window.alert(MESSAGES.OPERATION_UNAVAILABLE);
+      showToast(MESSAGES.OPERATION_UNAVAILABLE, "error");
     }
   }
 
@@ -73,7 +101,7 @@ export default function RecipesClient() {
         <Link href="/admin/recipes/new" className="inline-flex min-h-11 items-center rounded-full bg-[#254936] px-5 text-sm font-bold text-white hover:bg-[#1E3C2C] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#D86F46]/30">Nova receita</Link>
       </div>
 
-      <form className="mb-5 grid gap-3 rounded-2xl border border-[#E1E7DC] bg-[#FFFEFA] p-4 sm:grid-cols-[1fr_200px_170px_auto] sm:items-end" onSubmit={(event) => { event.preventDefault(); setPage(1); setRefresh((value) => value + 1); }}>
+      <form className="mb-5 grid gap-3 rounded-2xl border border-[#E1E7DC] bg-[#FFFEFA] p-4 sm:grid-cols-[1fr_200px_170px_220px_auto] sm:items-end" onSubmit={(event) => { event.preventDefault(); setPage(1); setRefresh((value) => value + 1); }}>
         <label className="text-sm font-semibold text-[#405447]">Buscar título
           <input value={filters.q} onChange={(event) => setFilters({ ...filters, q: event.target.value })} maxLength={100} className="mt-1 block min-h-11 w-full rounded-xl border border-[#DCE5D8] bg-white px-3 text-sm outline-none focus:border-[#789579] focus:ring-4 focus:ring-[#D86F46]/15" />
         </label>
@@ -87,18 +115,30 @@ export default function RecipesClient() {
             <option value="">Todas</option><option value="draft">Rascunho</option><option value="published">Publicada</option>
           </select>
         </label>
+        <label className="text-sm font-semibold text-[#405447]">Revisão editorial
+          <select value={filters.withoutImage ? "withoutImage" : filters.translationsPending ? "translationsPending" : "all"} onChange={(event) => setEditorialFilter(event.target.value)} className="mt-1 block min-h-11 w-full rounded-xl border border-[#DCE5D8] bg-white px-3 text-sm outline-none focus:border-[#789579] focus:ring-4 focus:ring-[#D86F46]/15">
+            <option value="all">Todas as receitas</option><option value="withoutImage">Sem imagem</option><option value="translationsPending">Traduções pendentes</option>
+          </select>
+        </label>
         <button className="min-h-11 rounded-full border border-[#C9D6C5] px-4 text-sm font-bold text-[#315B42] hover:bg-[#E9F0E5]" type="submit">Aplicar</button>
       </form>
 
       {result.status === "loading" && <p className="rounded-2xl bg-white p-6 text-sm text-[#667469]" role="status">Carregando receitas…</p>}
       {result.status === "error" && <div className="rounded-2xl border border-[#EACFC3] bg-[#FFF8F4] p-5" role="alert"><p className="font-semibold text-[#8D432D]">{result.error}</p><button className="mt-3 font-bold text-[#315B42] underline" onClick={() => setRefresh((value) => value + 1)} type="button">Tentar novamente</button></div>}
-      {result.status === "success" && result.items.length === 0 && <p className="rounded-2xl border border-[#E1E7DC] bg-[#FFFEFA] p-6 text-sm text-[#667469]" role="status">Nenhuma receita encontrada.</p>}
+      {result.status === "success" && result.items.length === 0 && <p className="rounded-2xl border border-[#E1E7DC] bg-[#FFFEFA] p-6 text-sm text-[#667469]" role="status">{filters.withoutImage ? "Nenhuma receita sem imagem." : filters.translationsPending ? "Nenhuma receita com tradução pendente." : "Nenhuma receita encontrada."}</p>}
       {result.status === "success" && result.items.length > 0 && <>
         <p className="mb-3 text-sm text-[#667469]">{result.total} {result.total === 1 ? "receita encontrada" : "receitas encontradas"}</p>
         <div className="grid gap-3">
           {result.items.map((recipe) => <article key={recipe.id} className="flex flex-col gap-4 rounded-2xl border border-[#E1E7DC] bg-[#FFFEFA] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-            <div className="min-w-0"><h2 className="truncate font-bold text-[#254936]">{titleFor(recipe)}</h2><p className="mt-1 text-xs text-[#667469]">{CATEGORIES.find(([value]) => value === recipe.category)?.[1] ?? recipe.category} · {recipe.prep_time_minutes} min · {recipe.servings} porções</p><span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${recipe.status === "published" ? "bg-[#E5F1E4] text-[#315B42]" : "bg-[#FFF1D6] text-[#7A5A1E]"}`}>{recipe.status === "published" ? "Publicada" : "Rascunho"}</span></div>
-            <div className="flex shrink-0 gap-2"><Link className="rounded-full border border-[#C9D6C5] px-4 py-2 text-sm font-bold text-[#315B42] hover:bg-[#E9F0E5]" href={`/admin/recipes/${recipe.id}`}>Editar</Link><button className="rounded-full border border-[#E7C7BB] px-4 py-2 text-sm font-bold text-[#9B4B34] hover:bg-[#FFF1EA]" onClick={() => removeRecipe(recipe)} type="button">Excluir</button></div>
+            <div className="min-w-0"><h2 className="truncate font-bold text-[#254936]">{titleFor(recipe)}</h2><p className="mt-1 text-xs text-[#667469]">{CATEGORIES.find(([value]) => value === recipe.category)?.[1] ?? recipe.category} · {recipe.prep_time_minutes} min · {recipe.servings} porções</p><span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${recipe.status === "published" ? "bg-[#E5F1E4] text-[#315B42]" : "bg-[#FFF1D6] text-[#7A5A1E]"}`}>{recipe.status === "published" ? "Publicada" : "Rascunho"}</span>
+              {recipe.translationStatus?.complete ? <p className="mt-3 inline-flex rounded-full bg-[#F1F7EE] px-3 py-1 text-xs font-bold text-[#315B42]">Traduções completas</p> : recipe.translationStatus?.pending?.length ? <div className="mt-3">
+                <p className="inline-flex rounded-full bg-[#FFF1D6] px-3 py-1 text-xs font-bold text-[#7A5A1E]">Traduções pendentes</p>
+                <ul className="mt-2 space-y-1 text-sm text-[#667469]">{recipe.translationStatus.pending.map((issue) => <li key={issue.language_code}><span className="font-semibold">{LOCALE_LABELS[issue.language_code] ?? issue.language_code}:</span> faltam {issue.missingFields.map((field) => TRANSLATION_FIELDS[field] ?? field).join(", ")}</li>)}</ul>
+                <Link href={correctionHref(recipe, recipe.translationStatus.pending[0])} className="mt-2 inline-flex font-bold text-[#315B42] underline underline-offset-4">Corrigir tradução</Link>
+              </div> : <p className="mt-3 text-xs font-semibold text-[#8A938A]">Situação das traduções indisponível</p>}
+              {recipe.imageMissing && <p className="mt-2 inline-flex rounded-full border border-[#E7C7BB] bg-[#FFF1EA] px-3 py-1 text-xs font-bold text-[#9B4B34]">Sem imagem</p>}
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2"><Link className="rounded-full border border-[#C9D6C5] px-4 py-2 text-sm font-bold text-[#315B42] hover:bg-[#E9F0E5]" href={`/admin/recipes/${recipe.id}`}>Editar</Link><button className="rounded-full border border-[#E7C7BB] px-4 py-2 text-sm font-bold text-[#9B4B34] hover:bg-[#FFF1EA]" onClick={() => removeRecipe(recipe)} type="button">Excluir</button></div>
           </article>)}
         </div>
         <div className="mt-5 flex items-center justify-between gap-3">

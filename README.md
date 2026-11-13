@@ -1,106 +1,72 @@
-# 🍽️ WhatToEat
+# WhatToEat
 
-**Não sabe o que comer? Deixe o WhatToEat escolher por você!**
+O WhatToEat ajuda a decidir o que preparar por meio de receitas revisadas manualmente, sorteio por categoria e páginas de detalhes. O MVP público não exige cadastro. O projeto está em desenvolvimento e ainda não foi publicado.
 
-O **WhatToEat** é uma aplicação web que ajuda você a decidir o que preparar, sugerindo receitas de forma aleatória de acordo com a categoria selecionada.
+## Funcionalidades atuais
 
-O projeto está sendo desenvolvido com foco em uma experiência simples, rápida e intuitiva, com suporte a múltiplos idiomas e uma arquitetura preparada para futuras expansões.
+### Site público
 
----
+- Sorteio de receitas publicadas por categoria.
+- Interface em português brasileiro (padrão) e inglês (`?locale=en`).
+- Página individual com ingredientes, quantidades ajustáveis, checklist e instruções.
+- Modo Cozinha com navegação por etapas.
+- Compartilhamento nativo quando suportado e cópia do link como alternativa.
+- Exibição de fotos cadastradas ou placeholder e páginas personalizadas de erro.
 
-## ✨ Funcionalidades
+### Painel administrativo
 
-- 🎲 Sorteio aleatório de receitas.
-- 🍕 Seleção de receitas por categoria.
-- 📖 Visualização de ingredientes e modo de preparo.
-- ⚖️ Ajuste de quantidades conforme o número de porções.
-- 🌎 Suporte a português brasileiro e inglês.
-- 🔐 Autenticação para administradores.
-- 🛠️ Painel administrativo em desenvolvimento.
+- Login administrativo Supabase Auth e rotas protegidas no servidor.
+- Dashboard com indicadores editoriais e acesso às listas filtradas.
+- Cadastro/edição de receitas, rascunhos, publicação/despublicação e exclusão.
+- Catálogo de ingredientes com pesquisa e integração ao editor de receitas.
+- Traduções editoriais em pt-BR e inglês.
+- Upload, substituição e remoção de fotos no Supabase Storage.
+- Formulários e mensagens administrativas exclusivamente em pt-BR.
+- Recuperação de senha implementada no código; o envio e o callback ainda aguardam validação por e-mail, temporariamente indisponível.
 
-## 🛠️ Tecnologias
+O usuário confirmou manualmente no navegador login, indicadores do dashboard, listagem, criação de rascunho, pesquisa/seleção de ingredientes, edição/salvamento, publicação/despublicação, upload/substituição/remoção de imagens, exclusão de uma receita de teste e correção de renderização dos detalhes. Essas confirmações não equivalem a E2E ou à auditoria de acesso por papéis. Consulte o roadmap para estados e pendências completos.
 
-| Tecnologia | Utilização |
-|---|---|
-| Next.js | Framework web e APIs |
-| React | Interface do usuário |
-| JavaScript | Linguagem de programação |
-| Tailwind CSS | Estilização |
-| Supabase | PostgreSQL e autenticação |
-| GitHub | Versionamento do código |
+## Tecnologia e organização
 
-## 🏗️ Arquitetura
+- Next.js 16 App Router e Route Handlers.
+- JavaScript, React 19 e Tailwind CSS 4.
+- Supabase PostgreSQL, Auth e Storage.
+- Arquitetura de monólito modular organizada por receitas, ingredientes e administração, com funções de domínio, casos de uso, repositórios e adaptadores HTTP.
 
-O projeto utiliza uma arquitetura modular inspirada nos princípios de **Clean Architecture**, **SOLID** e separação de responsabilidades.
+O acesso ao Supabase ocorre no servidor. Páginas e componentes do navegador chamam as APIs Next.js. Autenticação e autorização administrativas são verificadas no backend; RLS é uma camada adicional. A aplicação não usa `service_role` para contornar RLS e não deve conter credenciais privilegiadas no navegador.
 
-A organização considera quatro camadas:
+As migrations `20261111233556_initial_schema_baseline.sql` e `20261112035903_admin_editorial_and_storage.sql` estão registradas como aplicadas no projeto remoto. Ainda faltam reproduzir o schema em ambiente isolado e executar as verificações pgTAP preparadas. Não execute migration remota sem revisar o procedimento e obter autorização explícita.
 
-- **Presentation:** interface, páginas e endpoints HTTP.
-- **Application:** casos de uso e coordenação das operações.
-- **Domain:** regras de negócio e validações.
-- **Infrastructure:** comunicação com banco de dados e serviços externos.
+Veja [PLANO_DESENVOLVIMENTO.md](PLANO_DESENVOLVIMENTO.md) para o status por etapa e [ANALISE_ARQUITETURA_WEB_MOBILE.md](ANALISE_ARQUITETURA_WEB_MOBILE.md) para a arquitetura atual e compatibilidade mobile.
 
-Os módulos são organizados por funcionalidades, como receitas, ingredientes e administração.
+## Requisitos para desenvolvimento local
 
-## 🔒 Segurança
-
-O WhatToEat utiliza autenticação com Supabase Auth e autorização administrativa no backend.
-
-As operações administrativas são projetadas para exigir uma sessão válida e permissões específicas, com políticas de segurança no banco de dados como camada adicional de proteção.
-
-## 🚧 Status do desenvolvimento
-
-**Em desenvolvimento ativo.**
-
-| Módulo | Status |
-|---|---|
-| Interface pública | Implementada |
-| Sorteio de receitas | Implementado |
-| Detalhes e porções | Implementado |
-| Internacionalização | Implementada |
-| Autenticação administrativa | Parcial |
-| Dashboard administrativo | Parcial |
-| Gerenciamento de receitas | Em desenvolvimento |
-| Gerenciamento de ingredientes | Planejado |
-| Traduções administrativas | Planejado |
-| Upload de imagens | Planejado |
-
-## 🚀 Executando localmente
-
-### Pré-requisitos
-
-- Node.js compatível com o projeto
-- npm
-- Projeto Supabase configurado
-
-Clone o repositório:
-
-```bash
-git clone https://github.com/kratonbr/whattoeat.git
-cd whattoeat
-```
-
-Instale as dependências:
+- Node.js compatível com o Next.js 16 instalado.
+- npm.
+- Projeto Supabase configurado para o ambiente local.
 
 ```bash
 npm install
-```
-
-Configure as variáveis de ambiente conforme os arquivos e instruções do projeto, sem publicar credenciais privadas.
-
-Inicie o servidor:
-
-```bash
 npm run dev
 ```
 
-Acesse:
+Abra `http://localhost:3000`.
 
-```text
-http://localhost:3000
-```
+Configure localmente as variáveis necessárias, sem adicioná-las ao Git ou compartilhá-las em mensagens:
 
-### Verificações
+| Variável | Uso |
+|---|---|
+| `SUPABASE_URL` | URL do projeto Supabase |
+| `SUPABASE_PUBLISHABLE_KEY` | Chave publicável utilizada pelos clientes server-side e APIs públicas |
+| `APP_BASE_URL` | URL base permitida para o callback de recuperação em ambientes configurados |
+| `ADMIN_RECOVERY_COOKIE_SECRET` | Segredo server-only para a autorização temporária do fluxo de redefinição de senha |
+| `ADMIN_DASHBOARD_RLS_READY` | Gate server-side para consultas administrativas completas do dashboard |
+| `ADMIN_EDITORIAL_RLS_READY` | Gate server-side para operações editoriais após verificar RLS |
+| `ADMIN_STORAGE_READY` | Gate server-side para operações de imagens após verificar políticas do Storage |
+
+Os três gates administrativos devem ficar no servidor, nunca como `NEXT_PUBLIC_*`. Configurá-los não substitui revisão de políticas nem validação por papel. Não configure chaves `service_role` na aplicação. A recuperação de senha também depende das URLs e do template de e-mail configurados no Supabase Auth; a validação por e-mail está pendente.
+
+## Verificações automatizadas
 
 ```bash
 npm test
@@ -108,18 +74,18 @@ npm run lint
 npm run build
 ```
 
-## 🗺️ Próximos passos
+Na revisão documental de 12/11/2026 havia 15 arquivos de testes Node e 84 testes registrados. A última execução conhecida passou nos testes, lint e build antes de alterações recentes na recuperação de senha e no visual da página de receita. Essas mudanças recentes não foram revalidadas pela suíte nesta atualização. Não há testes end-to-end automatizados nem teste SQL pgTAP executado.
 
-- Concluir o painel administrativo.
-- Implementar o gerenciamento completo de receitas.
-- Integrar upload e gerenciamento de imagens.
-- Ampliar os testes automatizados.
-- Preparar a arquitetura para uma futura aplicação mobile.
+## Pendências principais
 
-## 👨‍💻 Desenvolvimento
+- Conferir que as contagens “Sem imagem” e “Traduções pendentes” do dashboard correspondem exatamente às listas filtradas.
+- Validar recuperação de senha quando o serviço de e-mail estiver disponível.
+- Reproduzir migrations e executar testes SQL/RLS em ambiente isolado; completar matriz de segurança por papel.
+- Consolidar a estratégia de slug canônico sem quebrar URLs antigas.
+- Revisar os módulos/fachadas existentes e investigar a lentidão relatada.
+- Validar responsividade, acessibilidade, SEO e funcionalidades públicas ainda não implementadas.
+- Preparar deploy e configuração de produção na Vercel; o site ainda não está publicado.
 
-Desenvolvido por [kratonbr](https://github.com/kratonbr).
+## Escopo
 
----
-
-**WhatToEat — Sua próxima refeição começa aqui.**
+Receitas são cadastradas e revisadas manualmente. O MVP não inclui autenticação de usuários finais. Aplicativo mobile Expo, recomendações personalizadas, favoritos, planejamento semanal e monetização continuam fora da implementação atual.

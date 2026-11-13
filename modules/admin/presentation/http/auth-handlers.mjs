@@ -12,7 +12,7 @@ async function readCredentials(request) {
   return { email, password };
 }
 
-export function createLoginPostHandler({ createClient }) {
+export function createLoginPostHandler({ createClient, clearRecoveryCapability = async () => {} }) {
   return async function POST(request) {
     const credentials = await readCredentials(request);
     if (credentials.error) return authJson({ error: credentials.error }, 400);
@@ -28,18 +28,20 @@ export function createLoginPostHandler({ createClient }) {
         await supabase.auth.signOut({ scope: "local" });
         return authJson({ error: "ADMIN_ACCESS_REQUIRED" }, 403);
       }
+      await clearRecoveryCapability();
       return authJson({ authenticated: true }, 200);
     } catch { return authJson({ error: "AUTH_UNAVAILABLE" }, 503); }
   };
 }
 
-export function createLogoutPostHandler({ createClient }) {
+export function createLogoutPostHandler({ createClient, clearRecoveryCapability = async () => {} }) {
   return async function POST(request) {
     if (!isSameOrigin(request)) return authJson({ error: "INVALID_ORIGIN" }, 403);
     try {
       const supabase = await createClient();
       const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) return authJson({ error: "LOGOUT_FAILED" }, 503);
+      await clearRecoveryCapability();
       return adminEmptyResponse(204, { relaxedCacheHeader: true });
     } catch { return authJson({ error: "AUTH_UNAVAILABLE" }, 503); }
   };

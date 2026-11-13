@@ -24,10 +24,10 @@ export function createSupabaseDashboardRepository(supabase, { pageSize = 500 } =
       return count;
     },
     listRecipesForMetrics() {
-      return fetchAllRows(() => supabase.from("recipes").select("id, status, image_path").order("id", { ascending: true }), pageSize);
+      return fetchAllRows(() => supabase.from("recipes").select("id, status, image_path").order("updated_at", { ascending: false }), pageSize);
     },
     listTranslationsForMetrics(locales) {
-      return fetchAllRows(() => supabase.from("recipe_translations").select("recipe_id, language_code, title, instructions")
+      return fetchAllRows(() => supabase.from("recipe_translations").select("recipe_id, language_code, slug, title, instructions")
         .in("language_code", locales).order("recipe_id", { ascending: true }).order("language_code", { ascending: true }), pageSize);
     },
   };

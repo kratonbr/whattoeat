@@ -1,26 +1,45 @@
-export const ADMIN_DASHBOARD_LOCALES = Object.freeze(["pt-BR", "en"]);
+import { SUPPORTED_RECIPE_LOCALES } from "../../recipes/domain/recipes.mjs";
+import { filterRecipesByEditorialStatus, getRecipeEditorialStatus } from "../../recipes/domain/editorial-status.mjs";
 
-function isTranslationComplete(translation) {
-  return Boolean(translation && typeof translation.title === "string" && translation.title.trim()
-    && Array.isArray(translation.instructions) && translation.instructions.length > 0);
+export const ADMIN_DASHBOARD_LOCALES = SUPPORTED_RECIPE_LOCALES;
+
+function groupTranslations(translations) {
+  const grouped = new Map();
+  for (const translation of translations) {
+    if (!grouped.has(translation.recipe_id)) grouped.set(translation.recipe_id, []);
+    grouped.get(translation.recipe_id).push(translation);
+  }
+  return grouped;
+}
+
+export function listRecipesWithPendingTranslations({ recipes, translations }, limit = Infinity) {
+  if (!Array.isArray(recipes) || !Array.isArray(translations)) throw new TypeError("Recipes and translations must be arrays.");
+  const translationsByRecipe = groupTranslations(translations);
+  return recipes.flatMap((recipe) => {
+    const recipeTranslations = translationsByRecipe.get(recipe.id) ?? [];
+    const { translationStatus } = getRecipeEditorialStatus(recipe, recipeTranslations);
+    if (translationStatus.complete) return [];
+    const title = recipeTranslations.find((translation) => translation.language_code === "pt-BR" && translation.title?.trim())?.title
+      ?? recipeTranslations.find((translation) => translation.title?.trim())?.title
+      ?? "Receita sem título";
+    return [{ id: recipe.id, title, status: recipe.status, pendingTranslations: translationStatus.pending }];
+  }).slice(0, limit);
 }
 
 export function calculateAdminDashboardMetrics({ recipes, translations }) {
   if (!Array.isArray(recipes) || !Array.isArray(translations)) throw new TypeError("Recipes and translations must be arrays.");
-  const translationsByRecipe = new Map();
-  for (const translation of translations) {
-    if (!translationsByRecipe.has(translation.recipe_id)) translationsByRecipe.set(translation.recipe_id, new Map());
-    translationsByRecipe.get(translation.recipe_id).set(translation.language_code, translation);
-  }
-  const translationsPending = recipes.filter((recipe) => {
-    const entries = translationsByRecipe.get(recipe.id);
-    return ADMIN_DASHBOARD_LOCALES.some((locale) => !isTranslationComplete(entries?.get(locale)));
-  }).length;
+  const translationsByRecipe = groupTranslations(translations);
+  const recipesWithStatus = recipes.map((recipe) => ({
+    ...recipe,
+    ...getRecipeEditorialStatus(recipe, translationsByRecipe.get(recipe.id) ?? []),
+  }));
+  const withoutImage = filterRecipesByEditorialStatus(recipesWithStatus, { withoutImage: true }).length;
+  const translationsPending = filterRecipesByEditorialStatus(recipesWithStatus, { translationsPending: true }).length;
   return {
     total: recipes.length,
     published: recipes.filter((recipe) => recipe.status === "published").length,
     drafts: recipes.filter((recipe) => recipe.status === "draft").length,
-    withoutImage: recipes.filter((recipe) => typeof recipe.image_path !== "string" || !recipe.image_path.trim()).length,
+    withoutImage,
     translationsPending,
   };
 }

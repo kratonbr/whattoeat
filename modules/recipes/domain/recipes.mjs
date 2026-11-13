@@ -1,6 +1,7 @@
 export const SUPPORTED_RECIPE_LOCALES = Object.freeze(["en", "pt-BR"]);
 export const DEFAULT_RECIPE_LOCALE = "pt-BR";
 export const SUPPORTED_RECIPE_CATEGORIES = Object.freeze(["breakfast", "lunch", "dinner", "snack", "dessert"]);
+export const SUPPORTED_RECIPE_DIFFICULTIES = Object.freeze(["easy", "medium", "hard"]);
 
 export function isSupportedRecipeLocale(locale) {
   return SUPPORTED_RECIPE_LOCALES.includes(locale);
@@ -8,6 +9,13 @@ export function isSupportedRecipeLocale(locale) {
 
 export function isSupportedRecipeCategory(category) {
   return SUPPORTED_RECIPE_CATEGORIES.includes(category);
+}
+
+export function createRecipeSlugFromTitle(title) {
+  return typeof title === "string"
+    ? title.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+    : "";
 }
 
 export function resolveRecipeIdFromSlugMatches(matches) {

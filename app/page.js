@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { getMessages } from "@/lib/i18n";
+import PublicRecipeCatalog from "@/components/recipes/PublicRecipeCatalog";
 import {
   DEFAULT_RECIPE_LOCALE,
   isSupportedRecipeLocale,
@@ -252,14 +253,45 @@ export default function Home() {
   const [meal, setMeal] = useState(null);
   const [category, setCategory] = useState("all");
   const [status, setStatus] = useState("idle");
+  const randomRequestRef = useRef({ sequence: 0, controller: null, inFlight: false });
+  const shouldScrollToMealRef = useRef(false);
   const isLoading = status === "loading";
   const t = getMessages(locale);
+  const showMealImage = status === "success" && Boolean(meal?.image_url);
 
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
 
-  async function suggestMeal({ requestedLocale = locale, recipeId = null } = {}) {
+  useEffect(() => () => randomRequestRef.current.controller?.abort(), []);
+
+  useEffect(() => {
+    if (status !== "success" || !meal || !shouldScrollToMealRef.current) return undefined;
+
+    shouldScrollToMealRef.current = false;
+    if (!window.matchMedia("(max-width: 1023px)").matches) return undefined;
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById("recipes")?.scrollIntoView({
+        behavior: reducedMotion ? "auto" : "smooth",
+        block: "start",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [meal, status]);
+
+  async function suggestMeal({ requestedLocale = locale, recipeId = null, scrollToResult = false } = {}) {
+    if (randomRequestRef.current.inFlight) return;
+
+    shouldScrollToMealRef.current = false;
+    const sequence = randomRequestRef.current.sequence + 1;
+    randomRequestRef.current.sequence = sequence;
+    randomRequestRef.current.controller?.abort();
+    const controller = new AbortController();
+    randomRequestRef.current.controller = controller;
+    randomRequestRef.current.inFlight = true;
     setStatus("loading");
     const params = new URLSearchParams({ locale: requestedLocale });
 
@@ -273,8 +305,11 @@ export default function Home() {
     try {
       const response = await fetch("/api/meals/random?" + params.toString(), {
         cache: "no-store",
+        signal: controller.signal,
       });
       const result = await response.json();
+
+      if (controller.signal.aborted || sequence !== randomRequestRef.current.sequence) return;
 
       if (response.status === 404 && result.error === "NO_RECIPES") {
         setMeal(null);
@@ -287,10 +322,17 @@ export default function Home() {
       }
 
       setMeal(result.meal);
+      shouldScrollToMealRef.current = scrollToResult;
       setStatus("success");
     } catch {
+      if (controller.signal.aborted || sequence !== randomRequestRef.current.sequence) return;
       setMeal(null);
       setStatus("error");
+    } finally {
+      if (sequence === randomRequestRef.current.sequence) {
+        randomRequestRef.current.controller = null;
+        randomRequestRef.current.inFlight = false;
+      }
     }
   }
 
@@ -310,18 +352,25 @@ export default function Home() {
   }
 
   function chooseCategory(value) {
+    randomRequestRef.current.sequence += 1;
+    randomRequestRef.current.controller?.abort();
+    randomRequestRef.current.controller = null;
+    randomRequestRef.current.inFlight = false;
+    shouldScrollToMealRef.current = false;
     setCategory(value);
     setMeal(null);
     setStatus("idle");
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#F7F5EF] text-[#20352A]">
-      <div aria-hidden="true" className="pointer-events-none absolute -right-44 -top-52 h-[34rem] w-[34rem] rounded-full bg-[#E4EBDD] opacity-70 blur-3xl" />
-      <div aria-hidden="true" className="pointer-events-none absolute -bottom-64 -left-48 h-[32rem] w-[32rem] rounded-full bg-[#F3E3D4] opacity-70 blur-3xl" />
+    <main className="relative flex min-h-screen flex-col overflow-x-clip bg-[#F7F5EF] text-[#20352A]">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -right-44 -top-52 h-[34rem] w-[34rem] rounded-full bg-[#E4EBDD] opacity-70 blur-3xl" />
+        <div className="absolute -bottom-64 -left-48 h-[32rem] w-[32rem] rounded-full bg-[#F3E3D4] opacity-70 blur-3xl" />
+      </div>
 
-      <header className="relative z-30 mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
-        <Link aria-label={t.brandLabel} className="group inline-flex items-center gap-3" href={locale === "en" ? "/?locale=en" : "/"}>
+      <header className="relative z-30 mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-y-3 px-4 py-5 sm:px-8 lg:px-12">
+        <Link aria-label={t.brandLabel} className="group inline-flex shrink-0 items-center gap-3" href={locale === "en" ? "/?locale=en" : "/"}>
           <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#254936] text-[#F7F5EF] shadow-lg shadow-[#254936]/15 transition-transform duration-200 group-hover:-rotate-3">
             <svg aria-hidden="true" className="h-6 w-6" fill="none" viewBox="0 0 24 24">
               <path d="M4 13h16a8 8 0 0 1-16 0Z" stroke="currentColor" strokeWidth="1.7" />
@@ -333,7 +382,10 @@ export default function Home() {
           </span>
         </Link>
 
-        <div className="flex items-center gap-2.5">
+        <div className="ml-auto flex min-w-0 items-center gap-2.5">
+          <a className="hidden min-h-10 items-center rounded-full px-3 text-xs font-bold text-[#365541] transition hover:bg-white/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D86F46] sm:inline-flex" href="#recipe-catalog">
+            {t.exploreRecipes} <span aria-hidden="true" className="ml-1">↗</span>
+          </a>
           <span className="hidden items-center gap-2 rounded-full border border-[#DCE3D7] bg-white/70 px-3.5 py-2 text-xs font-semibold text-[#496451] sm:inline-flex">
             <span className="h-1.5 w-1.5 rounded-full bg-[#7E9B70]" />
             {t.reviewed}
@@ -403,7 +455,7 @@ export default function Home() {
           <div className="mt-5">
             <button
               type="button"
-              onClick={suggestMeal}
+              onClick={() => suggestMeal({ scrollToResult: true })}
               disabled={isLoading}
               className="group inline-flex min-h-[62px] w-full items-center justify-center gap-3 rounded-[1.15rem] border border-white/35 bg-gradient-to-r from-[#DC8058] to-[#CB633E] px-6 py-4 text-base font-extrabold text-white shadow-[0_14px_28px_-12px_rgba(200,96,57,0.58)] transition-[transform,background-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:from-[#E18760] hover:to-[#D16A43] hover:shadow-[0_18px_34px_-13px_rgba(200,96,57,0.65)] active:translate-y-0 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#D86F46]/25 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-75 sm:w-auto sm:min-w-[230px]"
             >
@@ -440,6 +492,10 @@ export default function Home() {
             )}
           </div>
 
+          <p aria-atomic="true" aria-live="polite" className="sr-only">
+            {status === "success" && meal ? t.recipeSuggested(meal.title) : ""}
+          </p>
+
           <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-[#899187]">
             <span className="inline-flex items-center gap-2">
               <span className="grid h-5 w-5 place-items-center rounded-full bg-[#E4EBDD] text-[#52704F]">✓</span>
@@ -452,17 +508,29 @@ export default function Home() {
           </div>
         </section>
 
-        <aside className="mx-auto w-full max-w-xl lg:max-w-none">
+        <aside id="recipes" aria-label={locale === "en" ? "Recipe suggestion" : "Sugestão de receita"} className="mx-auto w-full max-w-xl scroll-mt-6 lg:max-w-none">
           <article aria-busy={isLoading} className="recipe-card-enter overflow-hidden rounded-[2rem] border border-white/80 bg-[#FFFEFA] p-2.5 shadow-[0_28px_80px_-36px_rgba(32,53,42,0.28)] sm:rounded-[2.35rem] sm:p-3">
             <div className="relative flex h-[230px] items-center justify-center overflow-hidden rounded-[1.45rem] bg-[#E8EEE2] sm:h-[300px] sm:rounded-[1.8rem]">
-              <div aria-hidden="true" className="placeholder-orbit absolute -left-8 top-8 h-28 w-28 rounded-full border border-[#C6D5C0]/70" />
-              <div aria-hidden="true" className="absolute -right-12 bottom-0 h-44 w-44 rounded-full bg-[#F0D6C1]/55" />
-              <div aria-hidden="true" className="absolute left-[18%] top-[14%] h-3 w-3 rounded-full bg-[#D9946B]/70" />
-              <div aria-hidden="true" className="absolute right-[18%] top-[20%] h-2 w-2 rounded-full bg-[#819B79]/70" />
-              <PlateIllustration />
-              <span className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/80 px-3 py-2 text-[0.62rem] font-bold uppercase tracking-[0.12em] text-[#647562] shadow-sm backdrop-blur sm:left-5 sm:top-5">
+              {!showMealImage && <>
+                <div aria-hidden="true" className="placeholder-orbit absolute -left-8 top-8 h-28 w-28 rounded-full border border-[#C6D5C0]/70" />
+                <div aria-hidden="true" className="absolute -right-12 bottom-0 h-44 w-44 rounded-full bg-[#F0D6C1]/55" />
+                <div aria-hidden="true" className="absolute left-[18%] top-[14%] h-3 w-3 rounded-full bg-[#D9946B]/70" />
+                <div aria-hidden="true" className="absolute right-[18%] top-[20%] h-2 w-2 rounded-full bg-[#819B79]/70" />
+              </>}
+              {showMealImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={`${meal.id}:${meal.image_path ?? ""}:${meal.image_url}`}
+                  src={meal.image_url}
+                  alt={meal.image_alt || meal.title}
+                  className="absolute inset-0 z-[1] h-full w-full object-cover"
+                  loading="eager"
+                  decoding="async"
+                />
+              ) : <PlateIllustration />}
+              <span className="absolute left-4 top-4 z-[2] inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/80 px-3 py-2 text-[0.62rem] font-bold uppercase tracking-[0.12em] text-[#647562] shadow-sm backdrop-blur sm:left-5 sm:top-5">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#D8794C]" />
-                {meal ? t.photoMissing : t.waitingMeal}
+                {status === "success" ? (showMealImage ? t.photoAvailable : t.photoMissing) : t.waitingMeal}
               </span>
             </div>
 
@@ -578,7 +646,9 @@ export default function Home() {
         </aside>
       </div>
 
-      <footer className="relative z-10 border-t border-[#E8E5DB] bg-white/35">
+      <PublicRecipeCatalog locale={locale} />
+
+      <footer className="relative z-10 mt-auto border-t border-[#E8E5DB] bg-white/35">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-5 text-center text-xs text-[#8C948A] sm:flex-row sm:items-center sm:justify-between sm:px-8 sm:text-left lg:px-12">
           <span>{t.footerMain}</span>
           <span className="font-medium">{t.footerTagline}</span>

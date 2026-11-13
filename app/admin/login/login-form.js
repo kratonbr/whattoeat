@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 const ERROR_MESSAGES = {
   EMAIL_REQUIRED: "Informe seu e-mail.",
@@ -110,6 +111,11 @@ export default function LoginForm() {
       >
         {isSubmitting ? "Entrando…" : "Entrar"}
       </button>
+      <p className="text-center text-sm">
+        <Link className="font-semibold text-[#254936] underline decoration-[#B8C9B5] underline-offset-4 hover:text-[#D86F46]" href="/admin/esqueci-senha">
+          Esqueci minha senha
+        </Link>
+      </p>
     </form>
   );
 }

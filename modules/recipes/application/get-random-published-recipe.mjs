@@ -8,7 +8,7 @@ export function createGetRandomPublishedRecipe({ recipeRepository, random = Math
     return recipeRepository.getPublishedRecipeById({
       id: selected.id,
       locale,
-      includeImage: false,
+      includeImage: true,
       includePreparation: false,
     });
   };

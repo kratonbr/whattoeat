@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useAdminToast } from "./admin-toast-provider";
 
 const ERRORS = {
   UNAUTHENTICATED: "Sua sessão expirou. Entre novamente.",
@@ -13,6 +14,7 @@ const ERRORS = {
 };
 
 export default function IngredientsClient() {
+  const { showToast } = useAdminToast();
   const [query, setQuery] = useState("");
   const [state, setState] = useState({ status: "loading", items: [], error: "" });
   const [refresh, setRefresh] = useState(0);
@@ -37,9 +39,10 @@ export default function IngredientsClient() {
         method: "DELETE", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: true }),
       });
       const body = response.status === 204 ? {} : await response.json().catch(() => ({}));
-      if (!response.ok) return window.alert(ERRORS[body.error] ?? ERRORS.OPERATION_UNAVAILABLE);
+      if (!response.ok) return showToast(ERRORS[body.error] ?? ERRORS.OPERATION_UNAVAILABLE, "error");
+      showToast("Ingrediente excluído com sucesso.", "success");
       setRefresh((value) => value + 1);
-    } catch { window.alert(ERRORS.OPERATION_UNAVAILABLE); }
+    } catch { showToast(ERRORS.OPERATION_UNAVAILABLE, "error"); }
   }
 
   return (

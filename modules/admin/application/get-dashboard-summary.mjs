@@ -1,4 +1,4 @@
-import { ADMIN_DASHBOARD_LOCALES, calculateAdminDashboardMetrics } from "../domain/dashboard.mjs";
+import { ADMIN_DASHBOARD_LOCALES, calculateAdminDashboardMetrics, listRecipesWithPendingTranslations } from "../domain/dashboard.mjs";
 
 export function createGetDashboardSummary({ dashboardRepository, adminReadPoliciesReady = false }) {
   return async function getDashboardSummary() {
@@ -8,6 +8,7 @@ export function createGetDashboardSummary({ dashboardRepository, adminReadPolici
         complete: false,
         unavailableReason: "ADMIN_RLS_REQUIRED",
         metrics: { total: null, published, drafts: null, withoutImage: null, translationsPending: null },
+        pendingRecipes: null,
       };
     }
     const [recipes, translations] = await Promise.all([
@@ -18,6 +19,7 @@ export function createGetDashboardSummary({ dashboardRepository, adminReadPolici
       complete: true,
       unavailableReason: null,
       metrics: calculateAdminDashboardMetrics({ recipes, translations }),
+      pendingRecipes: listRecipesWithPendingTranslations({ recipes, translations }, 5),
     };
   };
 }

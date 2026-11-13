@@ -1,5 +1,6 @@
 import Link from "next/link";
 import LogoutButton from "./logout-button";
+import AdminToastProvider from "./admin-toast-provider";
 
 function AdminNavigation({ mobile = false }) {
   const linkClass = mobile
@@ -12,17 +13,16 @@ function AdminNavigation({ mobile = false }) {
   return (
     <nav aria-label="Navegação administrativa" className={mobile ? "flex gap-2 overflow-x-auto pb-1" : "space-y-2"}>
       <Link aria-current="page" className={linkClass} href="/admin">
-        Visão geral
+        Dashboard
       </Link>
       <Link className={itemClass} href="/admin/recipes">Receitas</Link>
-      <Link className={itemClass} href="/admin/ingredients">Ingredientes</Link>
     </nav>
   );
 }
 
 export default function AdminShell({ children }) {
   return (
-    <div lang="pt-BR" className="min-h-screen bg-[#F7F5EF] text-[#20352A]">
+    <AdminToastProvider><div lang="pt-BR" className="min-h-screen bg-[#F7F5EF] text-[#20352A]">
       <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-[#E1E7DC] bg-[#FFFEFA] px-5 py-7 md:block">
         <Link className="text-lg font-extrabold tracking-tight text-[#254936]" href="/admin">
           WhatToEat
@@ -58,6 +58,6 @@ export default function AdminShell({ children }) {
         </header>
         <div className="mx-auto max-w-7xl px-4 py-7 sm:px-7 sm:py-9">{children}</div>
       </div>
-    </div>
+    </div></AdminToastProvider>
   );
 }

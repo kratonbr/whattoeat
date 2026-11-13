@@ -78,8 +78,12 @@ export function createRecipeImageHandlers({ requireAdmin, isReady, createReposit
           throw error;
         }
         if (oldPath && oldPath !== newPath) {
-          try { await repository.remove([oldPath]); }
-          catch (error) { logError("[POST /api/admin/recipes/:id/image]", error?.code ?? "IMAGE_CLEANUP_FAILED"); }
+          try {
+            const shared = typeof repository.isImageReferencedByAnotherRecipe === "function"
+              ? await repository.isImageReferencedByAnotherRecipe(oldPath, id)
+              : false;
+            if (!shared) await repository.remove([oldPath]);
+          } catch (error) { logError("[POST /api/admin/recipes/:id/image]", error?.code ?? "IMAGE_CLEANUP_FAILED"); }
         }
         let imageUrl = null;
         try { imageUrl = await repository.createSignedUrl(newPath); }
@@ -101,7 +105,11 @@ export function createRecipeImageHandlers({ requireAdmin, isReady, createReposit
         const repository = await createRepository();
         const oldPath = await repository.getRecipeImagePath(id);
         if (!oldPath) return adminJson({ data: { image_path: null, cleanupComplete: true } }, 200);
+        const shared = typeof repository.isImageReferencedByAnotherRecipe === "function"
+          ? await repository.isImageReferencedByAnotherRecipe(oldPath, id)
+          : false;
         await repository.attach(id, null);
+        if (shared) return adminJson({ data: { image_path: null, cleanupComplete: true, retainedForOtherRecipes: true } }, 200);
         try {
           await repository.remove([oldPath]);
           return adminJson({ data: { image_path: null, cleanupComplete: true } }, 200);

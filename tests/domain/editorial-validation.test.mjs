@@ -20,6 +20,7 @@ test("publication requires both locales, instructions and at least one ingredien
   assert.ok(result.errors.some((error) => error.field === "ingredientes"));
 });
 
+
 test("recipe validation rejects malformed ingredient UUIDs and duplicate ingredient links", () => {
   const base = { category: "dinner", prep_time_minutes: 30, servings: 2, status: "draft", translations: [] };
   const invalid = validateRecipePayload({ ...base, ingredients: [{ ingredient_id: "not-a-uuid", quantity: 1 }] });

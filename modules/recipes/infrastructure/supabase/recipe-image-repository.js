@@ -15,6 +15,15 @@ export function createSupabaseRecipeImageRepository(supabase) {
       if (!data) { const missing = new Error("Recipe not found."); missing.code = "P0002"; throw missing; }
       return data.image_path;
     },
+    async isImageReferencedByAnotherRecipe(imagePath, recipeId) {
+      if (!imagePath) return false;
+      const { count, error } = await supabase.from("recipes")
+        .select("id", { count: "exact", head: true })
+        .eq("image_path", imagePath)
+        .neq("id", recipeId);
+      if (error) repositoryError(error);
+      return (count ?? 0) > 0;
+    },
     async upload(path, bytes, contentType) {
       const { error } = await storage.upload(path, bytes, { contentType, cacheControl: "3600", upsert: false });
       if (error) repositoryError(error);
